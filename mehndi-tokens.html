@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<!--
+  Mehndi Token Board — one file, two views.
+    PIN 7868 → Screen  (the venue TV; it is also the hub the controller connects to)
+    PIN 6879 → Control (the main table: set up tables/stations/map, assign tokens, press Display)
+
+  Hosting: drop this file in a GitHub Pages repo (as index.html or any name).
+  Open the Screen first, then the Control panel on the main table's phone/laptop.
+
+  Sync is peer-to-peer (PeerJS public broker) — no accounts, no backend.
+  Two tabs in the same browser also sync with no internet at all.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#16051F">
+<title>Mehndi Tokens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Yatra+One&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{
+  --bg:#16051F; --bg2:#22082F; --panel:#2C0C3D; --panel2:#3A1450;
+  --line:rgba(255,182,39,.22); --line2:rgba(255,255,255,.10);
+  --magenta:#E5257D; --marigold:#FFB627; --saffron:#FF7A1A; --emerald:#12B886;
+  --cream:#FFF4DC; --muted:#C9A8D6; --dim:#8E6E9E; --danger:#F25F5C; --go:#16C172;
+  --r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{background:var(--bg);color:var(--cream);font-family:'Archivo',system-ui,sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent;
+  background-image:radial-gradient(ellipse at 50% 0%,rgba(229,37,125,.18),transparent 55%),
+                   radial-gradient(ellipse at 0% 100%,rgba(255,122,26,.14),transparent 50%);
+  background-attachment:fixed;}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;}
+button:disabled{cursor:not-allowed;}
+:focus-visible{outline:3px solid var(--marigold);outline-offset:2px;}
+input,select{font:inherit;color:inherit;}
+[hidden]{display:none !important;}
+.lattice{position:fixed;inset:0;opacity:.06;pointer-events:none;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%23FFB627' stroke-width='1.2'%3E%3Cpath d='M40 4c8 12 8 24 0 36-8-12-8-24 0-36zM40 76c8-12 8-24 0-36-8 12-8 24 0 36zM4 40c12-8 24-8 36 0-12 8-24 8-36 0zM76 40c-12-8-24-8-36 0 12 8 24 8 36 0z'/%3E%3Ccircle cx='40' cy='40' r='4'/%3E%3Ccircle cx='0' cy='0' r='6'/%3E%3Ccircle cx='80' cy='0' r='6'/%3E%3Ccircle cx='0' cy='80' r='6'/%3E%3Ccircle cx='80' cy='80' r='6'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:80px 80px;}
+.title-font{font-family:'Yatra One',serif;font-weight:400;}
+
+/* ═════════════ PIN GATE ═════════════ */
+#gate{position:relative;z-index:1;min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px;}
+.gate-card{width:100%;max-width:360px;text-align:center;}
+.gate-card h1{font-size:30px;line-height:1.15;color:var(--marigold);margin-bottom:6px;text-shadow:0 4px 18px rgba(255,122,26,.35);}
+.gate-card p{color:var(--muted);font-size:15px;font-weight:500;margin-bottom:26px;}
+.dots{display:flex;justify-content:center;gap:14px;margin-bottom:26px;}
+.dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--marigold);transition:background .15s;}
+.dots i.on{background:var(--marigold);}
+.dots.shake{animation:shake .4s;}
+@keyframes shake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.pad button{height:68px;border-radius:18px;background:var(--panel);border:1px solid var(--line2);font-size:26px;font-weight:800;transition:background .12s,transform .08s;}
+.pad button:active{background:var(--panel2);transform:scale(.96);}
+.pad .ghost{background:none;border-color:transparent;font-size:15px;color:var(--muted);font-weight:700;}
+.gate-err{min-height:22px;margin-top:16px;color:var(--danger);font-weight:700;font-size:14px;}
+.gate-hint{margin-top:10px;color:var(--dim);font-size:12.5px;font-weight:500;}
+
+/* ═════════════ SCREEN ═════════════ */
+#screen{position:fixed;inset:0;z-index:1;display:grid;grid-template-rows:auto auto 1fr;gap:1.6vh;padding:2.4vh 2vw 2vh;overflow:hidden;}
+#screen.idle{cursor:none;}
+.toran{position:absolute;top:0;left:0;right:0;height:3.6vh;display:flex;justify-content:space-around;pointer-events:none;}
+.toran i{display:block;width:1.8vh;height:1.8vh;border-radius:50%;margin-top:-.4vh;
+  background:radial-gradient(circle at 40% 35%,#FFD36B,var(--marigold) 45%,var(--saffron));}
+.toran i:nth-child(3n+2){background:radial-gradient(circle at 40% 35%,#FF8FBF,var(--magenta) 55%,#A0124F);margin-top:.4vh;}
+.toran i:nth-child(3n){margin-top:1vh;}
+.s-head{text-align:center;padding-top:1.2vh;}
+.s-head h1{font-size:clamp(22px,5.6vh,76px);line-height:1.05;color:var(--marigold);text-shadow:0 .4vh 2vh rgba(255,122,26,.35);}
+.s-strip{display:flex;align-items:center;gap:1.2vw;min-height:7.5vh;padding:.8vh 1.2vw;border-radius:1.6vh;
+  background:linear-gradient(90deg,rgba(229,37,125,.22),rgba(255,122,26,.12));border:1px solid rgba(229,37,125,.35);overflow:hidden;}
+.s-strip .lbl{flex-shrink:0;font-size:clamp(11px,1.9vh,24px);font-weight:900;letter-spacing:.22em;text-transform:uppercase;color:var(--marigold);font-stretch:110%;line-height:1.15;}
+.s-strip .items{display:flex;flex-wrap:wrap;gap:2vh .9vw;overflow:hidden;flex:1;height:6.2vh;align-items:center;align-content:flex-start;}
+.s-strip .empty{color:var(--muted);font-weight:600;font-size:clamp(12px,2.2vh,28px);}
+.jc{display:flex;align-items:center;gap:.6vw;flex-shrink:0;padding:.5vh 1vw;border-radius:1.2vh;background:rgba(0,0,0,.25);
+  font-size:clamp(14px,3.6vh,48px);font-weight:900;font-stretch:85%;white-space:nowrap;}
+.jc .ar{color:var(--muted);font-size:.7em;}
+.jc .to{padding:.1vh .7vw;border-radius:.8vh;color:#1A0620;font-size:.8em;}
+.jc.new{animation:chipIn .6s ease both;}
+@keyframes chipIn{from{opacity:0;transform:translateY(-1vh) scale(.9)}}
+.s-map{position:relative;display:grid;gap:1.4vh 1vw;min-height:0;}
+.s-wait{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;text-align:center;}
+.s-wait .big{font-size:clamp(36px,10vh,140px);color:var(--marigold);}
+.s-wait .small{font-size:clamp(14px,3vh,40px);color:var(--muted);font-weight:700;}
+.card{position:relative;container-type:size;display:flex;flex-direction:column;min-width:0;min-height:0;border-radius:1.6vh;overflow:hidden;
+  background:rgba(44,12,61,.92);border:.35vh solid var(--c);box-shadow:0 1vh 3vh rgba(0,0,0,.35);}
+.card .hd{flex:0 0 auto;background:var(--c);color:var(--ink);text-align:center;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
+  font-size:clamp(10px,min(13cqh,12cqw),60px);padding:1.5cqh 2cqw;line-height:1.1;font-stretch:105%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card .sts{flex:1;display:grid;grid-template-rows:repeat(var(--n),1fr);min-height:0;}
+.st{display:flex;align-items:center;gap:4cqw;padding:0 5cqw;min-height:0;border-top:1px solid var(--line2);position:relative;}
+.st:first-child{border-top:0;}
+.st .lt{flex:0 0 auto;font-size:calc(min(42cqh / var(--n), 13cqw));font-weight:900;color:var(--c);min-width:1.1em;text-align:center;}
+.st .tk{flex:1;text-align:right;font-size:calc(min(62cqh / var(--n), 30cqw));font-weight:900;font-stretch:82%;line-height:1;color:#fff;}
+.st .tk.none{color:var(--dim);font-weight:700;}
+.st.brk .tk{color:var(--dim);font-size:calc(min(34cqh / var(--n), 16cqw));text-transform:uppercase;letter-spacing:.1em;font-weight:800;}
+.st.brk .lt{opacity:.45;}
+.st.glow{background:color-mix(in srgb,var(--c) 26%,transparent);}
+.st.glow::after,.dk.glow::after{content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 .4vh var(--c);animation:glow 1.5s ease-in-out 5;}
+@keyframes glow{50%{opacity:.15}}
+.pop{animation:pop .9s cubic-bezier(.2,1.6,.4,1);}
+@keyframes pop{0%{transform:scale(.4);opacity:0;filter:blur(6px)}60%{opacity:1;filter:none}100%{transform:scale(1)}}
+.card.desk{--c:var(--marigold);--ink:#2A0A12;}
+.desk .dks{flex:1;display:grid;grid-template-columns:repeat(var(--dc),1fr);grid-auto-rows:1fr;gap:2cqh 2cqw;padding:3cqh 3cqw;min-height:0;align-content:center;}
+.dk{position:relative;display:flex;align-items:center;justify-content:center;border-radius:1vh;background:rgba(255,182,39,.12);
+  font-weight:900;font-stretch:82%;color:#fff;font-size:var(--dfs);line-height:1;min-height:0;}
+.desk .none{flex:1;display:flex;align-items:center;justify-content:center;color:var(--dim);font-weight:700;font-size:min(12cqh,10cqw);}
+.s-tools{position:fixed;right:1.4vw;bottom:1.4vh;display:flex;gap:8px;align-items:center;z-index:5;transition:opacity .4s;}
+#screen.idle .s-tools{opacity:0;}
+.s-tools button{padding:8px 12px;border-radius:10px;background:rgba(0,0,0,.45);border:1px solid var(--line2);font-size:13px;font-weight:700;color:var(--muted);}
+.cdot{width:11px;height:11px;border-radius:50%;background:var(--emerald);box-shadow:0 0 0 4px rgba(18,184,134,.18);}
+.cdot.warn{background:var(--marigold);box-shadow:0 0 0 4px rgba(255,182,39,.18);}
+.cdot.bad{background:var(--danger);box-shadow:0 0 0 4px rgba(242,95,92,.18);}
+#screen .cdot{position:fixed;left:1vw;bottom:1.2vh;opacity:.7;}
+
+/* ═════════════ CONTROL ═════════════ */
+#control{position:relative;z-index:1;min-height:100%;padding-bottom:calc(96px + env(safe-area-inset-bottom));}
+.c-top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:10px 16px;
+  background:rgba(22,5,31,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line2);}
+.c-top h1{font-size:17px;color:var(--marigold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
+.conn{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.tabs{display:flex;gap:4px;padding:3px;border-radius:12px;background:var(--panel);}
+.tabs button{padding:7px 14px;border-radius:9px;font-size:14px;font-weight:800;color:var(--muted);}
+.tabs button[aria-selected="true"]{background:var(--panel2);color:var(--cream);}
+.iconbtn{padding:7px 10px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted);border:1px solid var(--line2);}
+.banner{margin:12px 16px 0;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.banner.warn{background:rgba(255,182,39,.12);border:1px solid rgba(255,182,39,.4);}
+.banner.bad{background:rgba(242,95,92,.12);border:1px solid rgba(242,95,92,.45);}
+.banner button{margin-left:auto;padding:7px 12px;border-radius:9px;background:var(--marigold);color:#2A0A12;font-weight:800;font-size:13px;}
+.c-body{max-width:1280px;margin:0 auto;padding:14px 16px;display:grid;gap:14px;}
+@media (min-width:980px){
+  .c-body.call{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start;}
+  .c-body.call .col-r{position:sticky;top:70px;}
+}
+.panel{background:rgba(44,12,61,.85);border:1px solid var(--line2);border-radius:var(--r);padding:16px;min-width:0;}
+.panel h2{font-size:12.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--marigold);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.panel h2 .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--marigold);color:#2A0A12;font-size:12px;letter-spacing:0;}
+.panel h2 .sp{flex:1;}
+.hint{color:var(--muted);font-size:13px;font-weight:500;line-height:1.5;}
+.col-r{display:grid;gap:14px;align-content:start;min-width:0;}
+.col-l{display:grid;gap:14px;align-content:start;min-width:0;}
+
+.search{display:flex;gap:8px;margin-bottom:12px;}
+.search input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:11px 12px;font-size:16px;font-weight:700;outline:none;}
+.search input:focus{border-color:var(--marigold);}
+.btn{padding:10px 14px;border-radius:10px;font-weight:800;font-size:14px;background:var(--panel2);border:1px solid var(--line2);}
+.btn.pri{background:var(--marigold);color:#2A0A12;border-color:transparent;}
+.btn.danger{background:rgba(242,95,92,.14);color:#FFB3B1;border-color:rgba(242,95,92,.45);}
+.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:8px;}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--muted);font-weight:600;}
+.legend span{display:inline-flex;align-items:center;gap:6px;}
+.legend i{width:14px;height:14px;border-radius:4px;display:inline-block;}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px;max-height:min(52vh,520px);overflow:auto;padding:2px;overscroll-behavior:contain;}
+.tk-b{position:relative;height:44px;border-radius:9px;background:var(--bg2);border:1px solid var(--line2);font-size:15px;font-weight:800;}
+.tk-b.on{background:var(--c);color:var(--ink);border-color:transparent;}
+.tk-b.pend{outline:2px dashed var(--cream);outline-offset:-4px;}
+.tk-b.sel{box-shadow:0 0 0 3px var(--cream),0 0 0 6px var(--magenta);z-index:1;}
+.tk-b small{position:absolute;right:3px;bottom:1px;font-size:9px;font-weight:900;opacity:.85;}
+.selbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--bg2);font-size:14px;font-weight:700;min-height:48px;}
+.selbar .chip{padding:4px 10px;border-radius:8px;background:var(--magenta);color:#fff;font-weight:900;}
+.selbar .sp{flex:1;}
+
+.dest{display:grid;gap:10px;}
+.dt{border-radius:12px;border:1px solid var(--line2);background:var(--bg2);padding:10px;}
+.dt-h{display:flex;align-items:center;gap:8px;font-weight:900;font-size:14px;margin-bottom:8px;}
+.dt-h i{width:14px;height:14px;border-radius:4px;background:var(--c);}
+.sts-b{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;}
+.st-b{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 10px;border-radius:9px;border:2px solid var(--c);background:rgba(0,0,0,.18);font-weight:800;font-size:14px;min-height:46px;text-align:left;}
+.st-b .l{color:var(--c);font-weight:900;}
+.st-b .v{font-size:17px;font-weight:900;}
+.st-b .v.e{color:var(--dim);font-size:13px;}
+.st-b.pend{border-style:dashed;}
+.st-b.brk{opacity:.45;border-style:dotted;}
+.st-b.ready{box-shadow:0 0 0 2px rgba(255,255,255,.25);}
+.desk-b{display:flex;flex-direction:column;gap:8px;border:2px solid var(--marigold);}
+.desk-b .row{display:flex;align-items:center;gap:8px;}
+.dchips{display:flex;flex-wrap:wrap;gap:6px;}
+.dchips button{padding:6px 10px;border-radius:8px;background:rgba(255,182,39,.16);font-weight:900;}
+.dchips button.pend{outline:2px dashed var(--cream);outline-offset:-3px;}
+.dchips button.sel{box-shadow:0 0 0 3px var(--magenta);}
+
+.draft{display:grid;gap:6px;}
+.di{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--bg2);font-size:14px;font-weight:700;}
+.di .k{flex:0 0 auto;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:6px;}
+.di .k.add{background:rgba(22,193,114,.18);color:#7BE7B0;}
+.di .k.mov{background:rgba(255,182,39,.16);color:var(--marigold);}
+.di .k.rem{background:rgba(242,95,92,.16);color:#FFB3B1;}
+.di .k.set{background:rgba(155,93,229,.2);color:#D7B8FF;}
+.di .t{flex:1;min-width:0;}
+.di .x{width:32px;height:32px;border-radius:8px;color:var(--muted);font-size:16px;flex:0 0 auto;}
+.di .x:hover{background:rgba(255,255,255,.06);}
+.empty-note{color:var(--dim);font-size:13.5px;font-weight:600;padding:6px 2px;}
+
+.dbar{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  background:rgba(22,5,31,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line2);}
+.dbar .in{max-width:1280px;margin:0 auto;display:flex;gap:10px;align-items:center;}
+.dbar .stat{font-size:12.5px;font-weight:700;color:var(--muted);line-height:1.35;min-width:0;}
+.go{flex:1;max-width:520px;margin-left:auto;height:58px;border-radius:14px;background:var(--go);color:#03240F;font-size:18px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
+  box-shadow:0 8px 24px rgba(22,193,114,.35);transition:transform .08s,opacity .2s;}
+.go:active{transform:scale(.98);}
+.go:disabled{background:var(--panel2);color:var(--dim);box-shadow:none;}
+.undo{height:58px;padding:0 14px;border-radius:14px;border:1px solid var(--line2);font-weight:800;font-size:14px;color:var(--muted);white-space:nowrap;}
+@media (max-width:560px){ .dbar .stat{display:none;} .undo{padding:0 14px;} .undo .long{display:none;} .go{font-size:16px;letter-spacing:.03em;} }
+@media (max-width:640px){
+  .c-top{flex-wrap:wrap;row-gap:6px;}
+  .c-top h1{display:none;}
+  .c-top .conn{order:5;width:100%;}
+  .tabs{margin-right:auto;}
+}
+
+/* setup */
+.c-body.setup{grid-template-columns:1fr;}
+@media (min-width:1100px){ .c-body.setup{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;} }
+.field{display:grid;gap:6px;margin-bottom:12px;}
+.field label{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.field input{background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:15px;font-weight:700;outline:none;width:100%;}
+.field input:focus{border-color:var(--marigold);}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.tbl{border:1px solid var(--line2);border-left:5px solid var(--c);border-radius:12px;padding:12px;background:var(--bg2);display:grid;gap:10px;}
+.tbl-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.tbl-h b{font-size:15px;}
+.tbl-h input{width:64px;background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:6px 8px;font-weight:800;font-size:15px;}
+.tbl-h .sp{flex:1;}
+.sw{display:flex;flex-wrap:wrap;gap:6px;}
+.sw button{width:26px;height:26px;border-radius:7px;background:var(--c);}
+.sw button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--cream);}
+.stl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.stl .s{padding:7px 10px;border-radius:8px;border:2px solid var(--c);font-weight:900;font-size:13px;min-width:62px;}
+.stl .s.brk{opacity:.5;border-style:dotted;}
+.stl .s small{display:block;font-size:10px;font-weight:700;color:var(--muted);}
+.tlist{display:grid;gap:10px;margin-bottom:12px;}
+.mapwrap{overflow:auto;padding-bottom:4px;}
+.map-ed{position:relative;display:grid;gap:6px;min-width:420px;user-select:none;-webkit-user-select:none;}
+.cell{border:1px dashed rgba(255,255,255,.10);border-radius:10px;aspect-ratio:1.35;}
+.cell.hot{border-color:var(--marigold);background:rgba(255,182,39,.10);}
+.piece{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;background:var(--c);color:var(--ink);
+  font-weight:900;font-size:13px;touch-action:none;cursor:grab;box-shadow:0 4px 14px rgba(0,0,0,.35);text-align:center;line-height:1.15;padding:4px;}
+.piece small{font-size:10.5px;font-weight:800;opacity:.75;}
+.piece.drag{cursor:grabbing;opacity:.92;z-index:5;box-shadow:0 12px 30px rgba(0,0,0,.5);transform:scale(1.04);}
+.piece.desk{--c:var(--marigold);--ink:#2A0A12;outline:2px dashed rgba(42,10,18,.4);outline-offset:-5px;}
+.danger-zone{display:flex;flex-wrap:wrap;gap:10px;}
+
+/* dialogs + toast */
+dialog{margin:auto;border:1px solid var(--line);border-radius:16px;background:var(--bg2);color:var(--cream);padding:22px;max-width:min(420px,calc(100% - 32px));}
+dialog::backdrop{background:rgba(10,2,14,.7);backdrop-filter:blur(3px);}
+dialog h3{font-size:18px;margin-bottom:8px;}
+dialog p{color:var(--muted);font-size:14.5px;line-height:1.55;font-weight:500;margin-bottom:18px;}
+dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);opacity:0;z-index:60;
+  background:var(--cream);color:#2A0A12;padding:11px 16px;border-radius:12px;font-weight:800;font-size:14px;transition:all .25s;pointer-events:none;max-width:calc(100% - 32px);text-align:center;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media (prefers-reduced-motion:reduce){ *{animation:none !important;transition:none !important;} }
+</style>
+</head>
+<body>
+<div class="lattice" aria-hidden="true"></div>
+
+<!-- ═════════════ PIN GATE ═════════════ -->
+<section id="gate" hidden>
+  <div class="gate-card">
+    <h1 class="title-font" id="gTitle"></h1>
+    <p>Enter your PIN</p>
+    <div class="dots" id="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="pad" id="pad" role="group" aria-label="PIN keypad"></div>
+    <div class="gate-err" id="gErr" role="alert"></div>
+    <div class="gate-hint">This device will remember you until you lock it.</div>
+  </div>
+</section>
+
+<!-- ═════════════ SCREEN ═════════════ -->
+<section id="screen" hidden>
+  <div class="toran" id="toran" aria-hidden="true"></div>
+  <header class="s-head"><h1 class="title-font" id="sTitle"></h1></header>
+  <div class="s-strip"><div class="lbl">Just<br>called</div><div class="items" id="sStrip"></div></div>
+  <div class="s-map" id="sMap" aria-live="polite"></div>
+  <span class="cdot warn" id="sDot" title="Connecting…"></span>
+  <div class="s-tools">
+    <button id="sFull">⛶ Full screen</button>
+    <button id="sLock">Lock</button>
+  </div>
+</section>
+
+<!-- ═════════════ CONTROL ═════════════ -->
+<section id="control" hidden>
+  <div class="c-top">
+    <h1 class="title-font" id="cTitle"></h1>
+    <div class="conn"><span class="cdot warn" id="cDot"></span><span id="cConn">Connecting…</span></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="call">Call</button>
+      <button role="tab" aria-selected="false" data-tab="setup">Setup</button>
+    </div>
+    <button class="iconbtn" id="cLock" title="Lock this device">Lock</button>
+  </div>
+  <div id="cBanner"></div>
+
+  <!-- CALL -->
+  <div class="c-body call" id="tabCall">
+    <div class="col-l">
+      <div class="panel">
+        <h2><span class="n">1</span> Tap tokens <span class="sp"></span><button class="btn sm" id="selClear">Clear selection</button></h2>
+        <div class="search">
+          <input id="q" inputmode="numeric" autocomplete="off" placeholder="Type e.g. 46  or  41,42  or  41-45" aria-label="Find tokens">
+          <button class="btn pri" id="qGo">Select</button>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--bg2);border:1px solid var(--line2)"></i>Free</span>
+          <span><i style="background:var(--magenta)"></i>Placed (table colour)</span>
+          <span><i style="outline:2px dashed var(--cream);outline-offset:-3px"></i>Not on screen yet</span>
+        </div>
+        <div class="tgrid" id="tgrid" role="group" aria-label="Tokens"></div>
+        <div class="selbar" id="selbar"></div>
+      </div>
+    </div>
+    <div class="col-r">
+      <div class="panel">
+        <h2><span class="n">2</span> Send to</h2>
+        <div class="dest" id="dest"></div>
+      </div>
+      <div class="panel">
+        <h2><span class="n">3</span> Draft — not on screen yet <span class="sp"></span><button class="btn sm" id="discard">Discard all</button></h2>
+        <div class="draft" id="draft"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETUP -->
+  <div class="c-body setup" id="tabSetup" hidden>
+    <div class="col-l">
+      <div class="panel">
+        <h2>Event</h2>
+        <div class="field"><label for="fTitle">Heading on screen</label><input id="fTitle" maxlength="70"></div>
+        <div class="field"><label for="fTotal">Tokens issued (1 to …)</label><input id="fTotal" type="number" inputmode="numeric" min="1" max="2000"></div>
+      </div>
+      <div class="panel">
+        <h2>Tables &amp; stations <span class="sp"></span><button class="btn sm pri" id="addTable">+ Add table</button></h2>
+        <p class="hint" style="margin-bottom:12px">Tap a station to put it on a break, or back on. Stations are lettered A, B, C… — removing one takes away the last letter.</p>
+        <div class="tlist" id="tlist"></div>
+      </div>
+    </div>
+    <div class="col-r">
+      <div class="panel">
+        <h2>Floor plan</h2>
+        <p class="hint" style="margin-bottom:12px">Drag tables and the Front Desk to where they sit in the hall. Drop on another piece to swap them.</p>
+        <div class="row2" style="margin-bottom:12px">
+          <div class="field" style="margin:0"><label for="fCols">Columns</label><input id="fCols" type="number" min="1" max="14" inputmode="numeric"></div>
+          <div class="field" style="margin:0"><label for="fRows">Rows</label><input id="fRows" type="number" min="1" max="10" inputmode="numeric"></div>
+        </div>
+        <div class="mapwrap"><div class="map-ed" id="mapEd"></div></div>
+      </div>
+      <div class="panel">
+        <h2>Layout file</h2>
+        <p class="hint" style="margin-bottom:12px">Save the tables, stations and map to a file, and load it on any device. Tokens are not included.</p>
+        <div class="danger-zone">
+          <button class="btn" id="exp">⬇ Export layout</button>
+          <button class="btn" id="imp">⬆ Import layout</button>
+          <input type="file" id="impFile" accept=".json,application/json" hidden>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Reset</h2>
+        <p class="hint" style="margin-bottom:12px">Both go into the draft — the screen only changes when you press Display.</p>
+        <div class="danger-zone">
+          <button class="btn danger" id="clrTokens">Clear tokens</button>
+          <button class="btn danger" id="clrAll">Reset everything</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dbar">
+    <div class="in">
+      <div class="stat" id="dStat"></div>
+      <button class="undo" id="undoBtn" disabled>↶ Undo<span class="long"> last Display</span></button>
+      <button class="go" id="goBtn" disabled>Display</button>
+    </div>
+  </div>
+</section>
+
+<dialog id="dlg">
+  <h3 id="dlgT"></h3>
+  <p id="dlgP"></p>
+  <div class="acts"><button class="btn" id="dlgNo">Cancel</button><button class="btn danger" id="dlgYes">Confirm</button></div>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   SETTINGS — change these if you reuse the file for another event.
+   PEER_ID must be unique to your event: it is how the controller finds
+   the screen on the public PeerJS broker.
+   ═══════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  SCREEN_PIN:  '7868',
+  CONTROL_PIN: '6879',
+  TITLE:       'Salgirah Celebration Night Mehndi',
+  PEER_ID:     'salgirah-mehndi-tokens-q7x3k9',
+  TOKENS:      300
+};
+
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const uid = p => p + Math.random().toString(36).slice(2, 8);
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem('mehndi_' + k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('mehndi_' + k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem('mehndi_' + k); }catch(e){} }
+};
+
+/* Festive preset palette — ink is the readable text colour on top. */
+const PALETTE = [
+  {c:'#E5257D', ink:'#fff'},    {c:'#12B886', ink:'#04241A'}, {c:'#FFB627', ink:'#2A0A12'},
+  {c:'#3D7BFF', ink:'#fff'},    {c:'#FF7A1A', ink:'#2A0A12'}, {c:'#9B5DE5', ink:'#fff'},
+  {c:'#00B4D8', ink:'#03222A'}, {c:'#E63946', ink:'#fff'},    {c:'#8AC926', ink:'#132A04'},
+  {c:'#F4A3A8', ink:'#2A0A12'}
+];
+const inkOf = c => (PALETTE.find(p => p.c === c) || {ink:'#fff'}).ink;
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/* ─── Board model ──────────────────────────────────────────────────
+   { rev, title, total, cols, rows,
+     tables:[{id, num, color, x, y, stations:[{id, brk}]}],
+     desk:{x, y},
+     assign:{stationId: token}, deskTokens:[token],
+     recent:[{t, label, color}], changed:[keys], at } */
+function emptyBoard(){
+  return { rev:0, title:CONFIG.TITLE, total:CONFIG.TOKENS, cols:6, rows:4,
+           tables:[], desk:{x:5, y:3}, assign:{}, deskTokens:[], recent:[], changed:[], at:0 };
+}
+function normBoard(b){
+  const d = emptyBoard();
+  if(!b || typeof b !== 'object') return d;
+  const int = (v, def, lo, hi) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def; };
+  const out = {
+    rev: int(b.rev, 0, 0, Number.MAX_SAFE_INTEGER),
+    title: typeof b.title === 'string' ? b.title.slice(0, 70) : d.title,
+    total: int(b.total, d.total, 1, 2000),
+    cols: int(b.cols, d.cols, 1, 14), rows: int(b.rows, d.rows, 1, 10),
+    tables: (Array.isArray(b.tables) ? b.tables : []).slice(0, 60).map(t => ({
+      id: String(t.id || uid('t')), num: int(t.num, 1, 0, 999),
+      color: PALETTE.some(p => p.c === t.color) ? t.color : PALETTE[0].c,
+      x: int(t.x, 0, 0, 13), y: int(t.y, 0, 0, 9),
+      stations: (Array.isArray(t.stations) ? t.stations : []).slice(0, 26).map(s => ({ id: String(s.id || uid('s')), brk: !!s.brk }))
+    })),
+    desk: { x: int(b.desk && b.desk.x, d.desk.x, 0, 13), y: int(b.desk && b.desk.y, d.desk.y, 0, 9) },
+    assign: {}, deskTokens: [], recent: [], changed: [], at: int(b.at, 0, 0, Number.MAX_SAFE_INTEGER)
+  };
+  const sids = new Set(); out.tables.forEach(t => t.stations.forEach(s => sids.add(s.id)));
+  const used = new Set();
+  Object.keys(b.assign || {}).forEach(k => {
+    const t = int(b.assign[k], null, 1, 99999);
+    if(sids.has(k) && t != null && !used.has(t)){ out.assign[k] = t; used.add(t); }
+  });
+  (Array.isArray(b.deskTokens) ? b.deskTokens : []).forEach(v => {
+    const t = int(v, null, 1, 99999); if(t != null && !used.has(t)){ out.deskTokens.push(t); used.add(t); }
+  });
+  out.recent = (Array.isArray(b.recent) ? b.recent : []).slice(0, 8).map(r => ({
+    t: int(r.t, 0, 0, 99999), label: String(r.label || '').slice(0, 20), color: String(r.color || '#FFB627').slice(0, 9)
+  }));
+  out.changed = (Array.isArray(b.changed) ? b.changed : []).slice(0, 200).map(String);
+  return out;
+}
+const tableOfStation = (b, sid) => b.tables.find(t => t.stations.some(s => s.id === sid));
+function stationLabel(b, sid){
+  const t = tableOfStation(b, sid); if(!t) return '?';
+  return t.num + LETTERS[t.stations.findIndex(s => s.id === sid)];
+}
+function placeOf(b, tok){
+  for(const k in b.assign) if(b.assign[k] === tok) return {kind:'s', id:k};
+  if(b.deskTokens.includes(tok)) return {kind:'d'};
+  return null;
+}
+const samePlace = (a, c) => (!a && !c) || (a && c && a.kind === c.kind && (a.kind === 'd' || a.id === c.id));
+function placeText(b, p){ return !p ? '—' : p.kind === 'd' ? 'Front Desk' : 'Table ' + stationLabel(b, p.id); }
+function placeColor(b, p){ if(!p) return null; if(p.kind === 'd') return '#FFB627'; const t = tableOfStation(b, p.id); return t ? t.color : null; }
+const nextRev = prev => Math.max(Date.now(), (prev || 0) + 1);
+
+/* ═════════════ TRANSPORT ═════════════
+   The Screen is the hub. Messages: hello, welcome, publish, ack, state,
+   ping, denied, superseded. They travel over PeerJS data connections and,
+   for tabs in the same browser, over a BroadcastChannel. */
+const ME = uid('n');
+let bc = null;
+try{ bc = new BroadcastChannel('mehndi-tokens-' + CONFIG.PEER_ID); }catch(e){}
+
+function makeHub(handlers){
+  // handlers: onHello(msg, reply), onPublish(msg, reply), onStatus(str)
+  const conns = new Map();      // peerId → conn
+  let peer = null, viewerConn = null, isHost = false, dead = false, tries = 0;
+  const replyLocal = to => m => bc && bc.postMessage(Object.assign({to}, m));
+  if(bc) bc.addEventListener('message', e => {
+    const m = e.data || {};
+    if(m.to && m.to !== ME) return;
+    if(m.t === 'hello') handlers.onHello(m, replyLocal(m.from), m.from);
+    else if(m.t === 'publish') handlers.onPublish(m, replyLocal(m.from), m.from);
+  });
+  function broadcast(m){
+    if(bc) bc.postMessage(m);
+    conns.forEach(c => { try{ c.open && c.send(m); }catch(e){} });
+  }
+  function status(){
+    handlers.onStatus(isHost ? (peer && !peer.disconnected ? 'live' : 'local') : viewerConn ? 'viewer' : (window.Peer ? 'connecting' : 'local'));
+  }
+  function startHost(){
+    if(dead) return;
+    if(!window.Peer){ status(); return; }
+    try{ peer && peer.destroy(); }catch(e){}
+    peer = new Peer(CONFIG.PEER_ID, { debug: 0 });
+    peer.on('open', () => { isHost = true; tries = 0; status(); });
+    peer.on('connection', conn => {
+      conn.on('open', () => conns.set(conn.peer, conn));
+      conn.on('data', m => {
+        if(!m || typeof m !== 'object') return;
+        const reply = x => { try{ conn.send(x); }catch(e){} };
+        if(m.t === 'hello') handlers.onHello(m, reply, m.from || conn.peer);
+        else if(m.t === 'publish') handlers.onPublish(m, reply, m.from || conn.peer);
+      });
+      conn.on('close', () => conns.delete(conn.peer));
+      conn.on('error', () => conns.delete(conn.peer));
+    });
+    peer.on('disconnected', () => { status(); setTimeout(() => { try{ if(!dead && peer && !peer.destroyed) peer.reconnect(); }catch(e){} }, 2000); });
+    peer.on('error', err => {
+      isHost = false; status();
+      // Another screen already holds the hub id (or the broker still remembers
+      // this screen from before a reload): follow it as a viewer, and retry.
+      if(err && err.type === 'unavailable-id') becomeViewer();
+      else setTimeout(startHost, Math.min(15000, 2000 * ++tries));
+    });
+  }
+  function becomeViewer(){
+    try{ peer && peer.destroy(); }catch(e){}
+    peer = new Peer(undefined, { debug: 0 });
+    let got = false;
+    peer.on('open', () => {
+      const c = peer.connect(CONFIG.PEER_ID, { serialization: 'json', reliable: true });
+      c.on('open', () => { c.send({t:'hello', role:'viewer', pin:CONFIG.SCREEN_PIN, from:ME}); });
+      c.on('data', m => { got = true; viewerConn = c; status(); handlers.onViewerMsg && handlers.onViewerMsg(m); });
+      c.on('close', () => { viewerConn = null; setTimeout(startHost, 1500); });
+    });
+    peer.on('error', () => {});
+    // No hub answered: the id was stale — try to be the hub again.
+    setTimeout(() => { if(!got){ viewerConn = null; startHost(); } }, 8000);
+  }
+  startHost();
+  status();
+  return { broadcast, conns, isHost: () => isHost };
+}
+
+function makeClient(handlers){
+  // handlers: onMsg(m), onLink(bool)
+  let peer = null, conn = null, last = 0, dead = false, connecting = false;
+  function got(m){ if(!m || typeof m !== 'object') return; if(m.to && m.to !== ME) return; last = Date.now(); handlers.onMsg(m); }
+  if(bc) bc.addEventListener('message', e => {
+    const m = e.data || {};
+    if(['welcome','ack','state','ping','denied','superseded'].includes(m.t)) got(m);
+  });
+  function send(m){
+    m.from = ME;
+    if(bc) bc.postMessage(m);
+    if(conn && conn.open){ try{ conn.send(m); }catch(e){} }
+  }
+  function open(){
+    if(dead || connecting || !window.Peer) return;
+    connecting = true;
+    const go = () => {
+      try{ conn && conn.close(); }catch(e){}
+      conn = peer.connect(CONFIG.PEER_ID, { serialization: 'json', reliable: true });
+      conn.on('open', () => { connecting = false; handlers.onOpen(); });
+      conn.on('data', got);
+      conn.on('close', () => { connecting = false; conn = null; });
+      conn.on('error', () => { connecting = false; conn = null; });
+      setTimeout(() => { connecting = false; }, 7000);
+    };
+    if(peer && !peer.destroyed && peer.open) return go();
+    try{ peer && peer.destroy(); }catch(e){}
+    peer = new Peer(undefined, { debug: 0 });
+    peer.on('open', go);
+    peer.on('error', () => { connecting = false; });
+    peer.on('disconnected', () => { try{ peer.reconnect(); }catch(e){} });
+  }
+  // Watchdog: the screen pings every 4 s; quiet for 10 s means reconnect.
+  let wasLive = false;
+  setInterval(() => {
+    const live = Date.now() - last < 10000;
+    if(live && !wasLive) handlers.onOpen();   // (re)introduce ourselves whenever the screen reappears
+    wasLive = live;
+    handlers.onLink(live);
+    if(!live){ if(!conn || !conn.open) open(); handlers.onOpen(); }
+  }, 3000);
+  open();
+  setTimeout(() => handlers.onOpen(), 0);
+  return { send, live: () => Date.now() - last < 10000 };
+}
+
+/* ═════════════ PIN GATE ═════════════ */
+function showGate(){
+  $('gate').hidden = false;
+  $('gTitle').textContent = CONFIG.TITLE;
+  let pin = '';
+  const dots = [...$('dots').children];
+  const keys = ['1','2','3','4','5','6','7','8','9','clear','0','⌫'];
+  $('pad').innerHTML = keys.map(k => k === 'clear'
+    ? '<button class="ghost" data-k="c">Clear</button>'
+    : `<button data-k="${k}" aria-label="${k === '⌫' ? 'Delete' : k}">${k}</button>`).join('');
+  const paint = () => dots.forEach((d, i) => d.classList.toggle('on', i < pin.length));
+  function press(k){
+    $('gErr').textContent = '';
+    if(k === 'c') pin = '';
+    else if(k === '⌫') pin = pin.slice(0, -1);
+    else if(pin.length < 4) pin += k;
+    paint();
+    if(pin.length === 4){
+      const role = pin === CONFIG.SCREEN_PIN ? 'screen' : pin === CONFIG.CONTROL_PIN ? 'control' : null;
+      if(!role){
+        $('dots').classList.remove('shake'); void $('dots').offsetWidth; $('dots').classList.add('shake');
+        $('gErr').textContent = 'That PIN is not right — try again.';
+        setTimeout(() => { pin = ''; paint(); }, 350);
+        return;
+      }
+      LS.set('role', role);
+      try{ sessionStorage.setItem('mehndi_role', role); }catch(e){}
+      $('gate').hidden = true;
+      if(role === 'screen'){ try{ document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){} }
+      start(role);
+    }
+  }
+  $('pad').addEventListener('click', e => { const b = e.target.closest('button'); if(b) press(b.dataset.k); });
+  document.addEventListener('keydown', function onKey(e){
+    if($('gate').hidden){ document.removeEventListener('keydown', onKey); return; }
+    if(/^[0-9]$/.test(e.key)) press(e.key);
+    else if(e.key === 'Backspace') press('⌫');
+    else if(e.key === 'Escape') press('c');
+  });
+}
+function lock(){ LS.del('role'); try{ sessionStorage.removeItem('mehndi_role'); }catch(e){} location.reload(); }
+function start(role){ role === 'screen' ? startScreen() : startControl(); }
+
+/* ═════════════ SCREEN ═════════════ */
+function startScreen(){
+  document.title = 'Screen — ' + CONFIG.TITLE;
+  $('screen').hidden = false;
+  $('toran').innerHTML = '<i></i>'.repeat(30);
+  let board = normBoard(LS.get('screen_board', null));
+  let activeControl = null;
+
+  function apply(next, animate){
+    next = normBoard(next);
+    if(next.rev <= board.rev) return false;
+    board = next;
+    LS.set('screen_board', board);
+    render(animate && Date.now() - board.at < 60000);
+    return true;
+  }
+
+  const hub = makeHub({
+    onHello(m, reply, who){
+      if(m.role === 'control'){
+        if(m.pin !== CONFIG.CONTROL_PIN) return reply({t:'denied'});
+        // One controller at a time: the newest one in takes over.
+        if(activeControl && activeControl.who !== who) activeControl.reply({t:'superseded', to: activeControl.who});
+        activeControl = {who, reply};
+      }else if(m.pin !== CONFIG.SCREEN_PIN) return reply({t:'denied'});
+      reply({t:'welcome', board});
+    },
+    onPublish(m, reply, who){
+      if(m.pin !== CONFIG.CONTROL_PIN) return reply({t:'denied'});
+      if(!activeControl) activeControl = {who, reply};   // screen restarted: first controller back is in charge
+      if(activeControl.who !== who) return reply({t:'superseded', to: who});
+      if(apply(m.board, true)) hub.broadcast({t:'state', board});
+      reply({t:'ack', rev: board.rev});
+    },
+    onViewerMsg(m){ if(m.board) apply(m.board, m.t === 'state'); },
+    onStatus(st){
+      const dot = $('sDot');
+      dot.className = 'cdot' + (st === 'live' || st === 'viewer' ? '' : st === 'connecting' ? ' warn' : ' bad');
+      dot.title = {live:'Ready — controller can connect', viewer:'Following the main screen', connecting:'Connecting…', local:'Offline — same-device only'}[st];
+    }
+  });
+  setInterval(() => hub.broadcast({t:'ping', rev: board.rev}), 4000);
+
+  let shownRecent = [];
+  function render(animate){
+    $('sTitle').textContent = board.title;
+    // Just called
+    const keys = board.recent.map(r => r.t + '>' + r.label);
+    $('sStrip').innerHTML = board.recent.length ? board.recent.map((r, i) =>
+      `<div class="jc${animate && !shownRecent.includes(keys[i]) ? ' new' : ''}">${r.t}<span class="ar">→</span><span class="to" style="background:${esc(r.color)}">${esc(r.label)}</span></div>`).join('')
+      : '<div class="empty">Called tokens will appear here</div>';
+    shownRecent = keys;
+
+    // Map — trimmed to the cells actually used so it fills the screen.
+    const map = $('sMap');
+    const items = board.tables.map(t => ({x:t.x, y:t.y, t})).concat([{x:board.desk.x, y:board.desk.y, desk:true}]);
+    if(!board.tables.length){
+      map.style.gridTemplateColumns = map.style.gridTemplateRows = '';
+      map.innerHTML = '<div class="s-wait"><div class="big title-font">Welcome</div><div class="small">Mehndi tokens will be called on this screen</div></div>';
+      return;
+    }
+    // Empty rows/columns are dropped: same relative layout, much bigger tiles.
+    const xs = [...new Set(items.map(i => i.x))].sort((a, c) => a - c);
+    const ys = [...new Set(items.map(i => i.y))].sort((a, c) => a - c);
+    map.style.gridTemplateColumns = `repeat(${xs.length}, minmax(0,1fr))`;
+    map.style.gridTemplateRows = `repeat(${ys.length}, minmax(0,1fr))`;
+    const changed = new Set(animate ? board.changed : []);
+    map.innerHTML = items.map(i => {
+      const pos = `grid-column:${xs.indexOf(i.x) + 1};grid-row:${ys.indexOf(i.y) + 1};`;
+      if(i.desk){
+        const n = board.deskTokens.length;
+        const dc = Math.max(1, Math.ceil(Math.sqrt(n * 1.4))), dr = Math.max(1, Math.ceil(n / dc));
+        const fs = `min(${Math.round(62 / dr)}cqh, ${Math.round(32 / dc)}cqw)`;
+        return `<div class="card desk" style="${pos}--dc:${dc};--dfs:${fs}"><div class="hd">Front Desk</div>` +
+          (n ? `<div class="dks">${board.deskTokens.map(t => {
+              const hot = changed.has('d:' + t);
+              return `<div class="dk${hot ? ' glow' : ''}"><span class="${hot ? 'pop' : ''}">${t}</span></div>`; }).join('')}</div>`
+             : '<div class="none">—</div>') + '</div>';
+      }
+      const t = i.t, n = Math.max(1, t.stations.length);
+      return `<div class="card" style="${pos}--c:${t.color};--ink:${inkOf(t.color)};--n:${n}"><div class="hd">Table ${t.num}</div><div class="sts">` +
+        (t.stations.length ? t.stations.map((s, k) => {
+          const tok = board.assign[s.id], hot = changed.has('s:' + s.id) && tok != null;
+          return `<div class="st${s.brk ? ' brk' : ''}${hot ? ' glow' : ''}"><span class="lt">${LETTERS[k]}</span>` +
+            (s.brk ? '<span class="tk">Break</span>'
+             : tok != null ? `<span class="tk${hot ? ' pop' : ''}">${tok}</span>` : '<span class="tk none">—</span>') + '</div>';
+        }).join('') : '<div class="st"><span class="tk none">—</span></div>') + '</div></div>';
+    }).join('');
+  }
+  render(false);
+
+  // Wake lock, idle cursor, tools
+  let wake = null;
+  const keepAwake = async () => { try{ if('wakeLock' in navigator && !document.hidden) wake = await navigator.wakeLock.request('screen'); }catch(e){} };
+  keepAwake();
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) keepAwake(); });
+  $('sFull').onclick = () => { if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(()=>{}); keepAwake(); };
+  $('sLock').onclick = () => confirmBox('Lock this screen?', 'You will need the PIN to open it again.', 'Lock', lock);
+  let idleT;
+  const wakeUi = () => { $('screen').classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => $('screen').classList.add('idle'), 3000); };
+  document.addEventListener('mousemove', wakeUi); document.addEventListener('touchstart', wakeUi); wakeUi();
+}
+
+/* ═════════════ CONTROL ═════════════ */
+function startControl(){
+  document.title = 'Control — ' + CONFIG.TITLE;
+  $('control').hidden = false;
+
+  let pub   = normBoard(LS.get('ctl_pub', null));        // what the screen shows (or will, once reached)
+  let draft = normBoard(LS.get('ctl_draft', null) || pub);
+  let history = LS.get('ctl_hist', []).map(normBoard);   // earlier pubs, newest last, for Undo
+  let ackRev = LS.get('ctl_ack', 0);
+  let sel = [];                                          // selected tokens, in tap order
+  let superseded = false, linkLive = false;
+  if(!pub.tables.length && !pub.rev && !draft.tables.length) seedLayout();
+
+  function seedLayout(){
+    // A starting point: 6 tables × 3 stations around the hall, Front Desk by the door.
+    draft.tables = [];
+    const spots = [[0,0],[2,0],[4,0],[0,2],[2,2],[4,2]];
+    spots.forEach((p, i) => draft.tables.push({ id: uid('t'), num: i + 1, color: PALETTE[i].c, x: p[0], y: p[1],
+      stations: [0,1,2].map(() => ({ id: uid('s'), brk: false })) }));
+    draft.cols = 6; draft.rows = 4; draft.desk = {x:5, y:3};
+  }
+  const save = () => { LS.set('ctl_pub', pub); LS.set('ctl_draft', draft); LS.set('ctl_hist', history.slice(-10)); LS.set('ctl_ack', ackRev); };
+
+  /* ── sync ── */
+  const client = makeClient({
+    onOpen(){ if(!superseded) client.send({t:'hello', role:'control', pin:CONFIG.CONTROL_PIN}); },
+    onMsg(m){
+      if(m.t === 'denied'){ banner('bad', 'The screen refused this PIN. Check that both devices have the same file.'); return; }
+      if(m.t === 'superseded'){ superseded = true; renderStatus(); return; }
+      if(m.t === 'welcome' && m.board){
+        const hb = normBoard(m.board);
+        if(hb.rev < pub.rev){ sendPub(); }                    // screen lost its copy → restore it
+        else if(hb.rev > pub.rev){                           // screen is ahead (another device) → adopt
+          const clean = !diff(pub, draft).length;
+          pub = hb; if(clean) draft = clone(pub); ackRev = pub.rev; save(); renderAll();
+        }else{ ackRev = pub.rev; save(); renderStatus(); }
+      }
+      if(m.t === 'ack'){ ackRev = Math.max(ackRev, m.rev || 0); save(); renderStatus(); }
+      if(m.t === 'ping' && typeof m.rev === 'number' && m.rev < pub.rev && !superseded) sendPub();
+    },
+    onLink(live){ if(live !== linkLive){ linkLive = live; renderStatus(); } }
+  });
+  let lastSend = 0;
+  function sendPub(){
+    if(superseded || Date.now() - lastSend < 1500) return;
+    lastSend = Date.now();
+    client.send({t:'publish', pin:CONFIG.CONTROL_PIN, board:pub});
+  }
+  function takeBack(){ superseded = false; renderBanner(); client.send({t:'hello', role:'control', pin:CONFIG.CONTROL_PIN}); }
+
+  /* ── diff: what Display would change ── */
+  function diff(a, b){
+    const out = [];
+    const toks = new Set();
+    [a, b].forEach(x => { Object.values(x.assign).forEach(t => toks.add(t)); x.deskTokens.forEach(t => toks.add(t)); });
+    [...toks].sort((p, q) => p - q).forEach(t => {
+      const pa = placeOf(a, t), pb = placeOf(b, t);
+      if(samePlace(pa, pb)){
+        // Same station id but the table was renumbered: still worth no line.
+        return;
+      }
+      if(!pa) out.push({k:'add', tok:t, text:`${t} → ${placeText(b, pb)}`});
+      else if(!pb) out.push({k:'rem', tok:t, text:`Remove ${t} from ${placeText(a, pa)}`});
+      else out.push({k:'mov', tok:t, text:`${t}: ${placeText(a, pa)} → ${placeText(b, pb)}`});
+    });
+    if(a.title !== b.title) out.push({k:'set', text:'Heading changed'});
+    if(a.total !== b.total) out.push({k:'set', text:`Tokens now 1–${b.total}`});
+    const ta = new Map(a.tables.map(t => [t.id, t])), tb = new Map(b.tables.map(t => [t.id, t]));
+    b.tables.forEach(t => {
+      const o = ta.get(t.id);
+      if(!o){ out.push({k:'set', text:`Table ${t.num} added (${t.stations.length} stations)`}); return; }
+      const bits = [];
+      if(o.num !== t.num) bits.push(`renumbered from ${o.num}`);
+      if(o.color !== t.color) bits.push('colour');
+      if(o.x !== t.x || o.y !== t.y) bits.push('moved');
+      if(o.stations.length !== t.stations.length) bits.push(`${t.stations.length} stations`);
+      const brkOn = t.stations.filter((s, i) => s.brk && !(o.stations.find(x => x.id === s.id) || {}).brk).map(s => t.num + LETTERS[t.stations.indexOf(s)]);
+      const brkOff = t.stations.filter(s => !s.brk && (o.stations.find(x => x.id === s.id) || {}).brk).map(s => t.num + LETTERS[t.stations.indexOf(s)]);
+      if(brkOn.length) bits.push(brkOn.join(', ') + ' on break');
+      if(brkOff.length) bits.push(brkOff.join(', ') + ' back');
+      if(bits.length) out.push({k:'set', text:`Table ${t.num}: ${bits.join(' · ')}`});
+    });
+    a.tables.forEach(t => { if(!tb.has(t.id)) out.push({k:'set', text:`Table ${t.num} removed`}); });
+    if(a.desk.x !== b.desk.x || a.desk.y !== b.desk.y) out.push({k:'set', text:'Front Desk moved'});
+    if(a.cols !== b.cols || a.rows !== b.rows) out.push({k:'set', text:`Floor plan ${b.cols}×${b.rows}`});
+    return out;
+  }
+
+  /* ── token moves (all on the draft) ── */
+  function unplace(b, tok){
+    for(const k in b.assign) if(b.assign[k] === tok) delete b.assign[k];
+    b.deskTokens = b.deskTokens.filter(t => t !== tok);
+  }
+  function toStation(sid){
+    const t = tableOfStation(draft, sid), s = t && t.stations.find(x => x.id === sid);
+    if(!s) return;
+    if(s.brk) return toast(`${stationLabel(draft, sid)} is on a break`);
+    const tok = sel.shift();
+    const prev = draft.assign[sid];
+    unplace(draft, tok);
+    draft.assign[sid] = tok;
+    toast(`${tok} → ${stationLabel(draft, sid)}` + (prev != null && prev !== tok ? ` (${prev} taken off)` : ''));
+    commit();
+  }
+  function toDesk(){
+    const n = sel.length;
+    sel.forEach(tok => { unplace(draft, tok); draft.deskTokens.push(tok); });
+    draft.deskTokens.sort((p, q) => p - q);
+    toast(n === 1 ? `${sel[0]} → Front Desk` : `${n} tokens → Front Desk`);
+    sel = []; commit();
+  }
+  function removeSel(){
+    const n = sel.length;
+    sel.forEach(tok => unplace(draft, tok));
+    toast(n === 1 ? `${sel[0]} taken off the board` : `${n} tokens taken off the board`);
+    sel = []; commit();
+  }
+  function revertToken(tok){
+    const p = placeOf(pub, tok);
+    unplace(draft, tok);
+    if(p && p.kind === 'd') draft.deskTokens.push(tok), draft.deskTokens.sort((x, y) => x - y);
+    else if(p && tableOfStation(draft, p.id)){
+      const other = draft.assign[p.id];
+      if(other != null) delete draft.assign[p.id];
+      draft.assign[p.id] = tok;
+    }
+    commit();
+  }
+  function toggleSel(tok){
+    const i = sel.indexOf(tok);
+    if(i >= 0) sel.splice(i, 1); else sel.push(tok);
+    renderCall();
+  }
+  function commit(){ draft = normBoard(draft); save(); renderAll(); }
+
+  /* ── Display / Undo ── */
+  function display(){
+    const changes = diff(pub, draft);
+    if(!changes.length) return;
+    const next = clone(draft);
+    // "Just called": newest assignments first, only tokens still on the board.
+    const fresh = [], changed = [];
+    changes.filter(c => c.k === 'add' || c.k === 'mov').forEach(c => {
+      const p = placeOf(next, c.tok);
+      fresh.push({t:c.tok, label: p.kind === 'd' ? 'Desk' : stationLabel(next, p.id), color: placeColor(next, p)});
+      changed.push(p.kind === 'd' ? 'd:' + c.tok : 's:' + p.id);
+    });
+    const still = r => { const p = placeOf(next, r.t); return p && !fresh.some(f => f.t === r.t); };
+    next.recent = fresh.reverse().concat(pub.recent.filter(still)).slice(0, 8);
+    next.changed = changed;
+    next.at = Date.now();
+    next.rev = nextRev(pub.rev);
+    history.push(clone(pub)); history = history.slice(-10);
+    pub = normBoard(next); draft = clone(pub);
+    lastSend = 0; sendPub(); save(); renderAll();
+    toast(linkLive ? 'Sent to the screen' : 'Saved — it will reach the screen once connected');
+  }
+  function undo(){
+    const prev = history.pop();
+    if(!prev) return;
+    const keep = draft;               // pending edits + the undone changes stay in the draft
+    const back = normBoard(prev);
+    back.rev = nextRev(pub.rev); back.changed = []; back.at = Date.now();
+    pub = back; draft = keep;
+    lastSend = 0; sendPub(); save(); renderAll();
+    toast('Screen reverted — those changes are back in the draft');
+  }
+
+  /* ── rendering ── */
+  function renderStatus(){
+    const dot = $('cDot'), txt = $('cConn');
+    const waiting = pub.rev > ackRev;
+    dot.className = 'cdot' + (linkLive && !superseded ? (waiting ? ' warn' : '') : ' bad');
+    txt.textContent = superseded ? 'Not in control' : linkLive ? (waiting ? 'Sending…' : 'Screen connected') : 'Screen not reachable';
+    const n = diff(pub, draft).length;
+    $('goBtn').disabled = !n || superseded;
+    $('goBtn').textContent = n ? `Display (${n} change${n > 1 ? 's' : ''})` : 'Display';
+    $('undoBtn').disabled = !history.length || superseded;
+    $('dStat').innerHTML = !linkLive ? 'Open the Screen first.<br>Changes are kept here meanwhile.'
+      : waiting ? 'Waiting for the screen<br>to confirm…' : 'Screen is up to date.';
+    renderBanner();
+  }
+  function banner(kind, html, btn, fn){
+    $('cBanner').innerHTML = `<div class="banner ${kind}"><span>${html}</span>${btn ? `<button id="bnBtn">${btn}</button>` : ''}</div>`;
+    if(btn) $('bnBtn').onclick = fn;
+  }
+  function renderBanner(){
+    if(superseded) banner('bad', 'Another device has taken control of the screen. Only one controller can send at a time.', 'Take control back', takeBack);
+    else if(!linkLive) banner('warn', '<b>Screen not reachable.</b> Make sure the screen page is open (PIN ' + '••••' + ') and both devices are online. Your changes are safe here and will be sent when it connects.');
+    else $('cBanner').innerHTML = '';
+  }
+  function renderCall(){
+    $('cTitle').textContent = draft.title;
+    // token grid
+    const total = draft.total;
+    let html = '';
+    for(let t = 1; t <= total; t++){
+      const p = placeOf(draft, t), pend = !samePlace(p, placeOf(pub, t));
+      const col = placeColor(draft, p);
+      const lab = p ? (p.kind === 'd' ? 'FD' : stationLabel(draft, p.id)) : '';
+      html += `<button class="tk-b${p ? ' on' : ''}${pend ? ' pend' : ''}${sel.includes(t) ? ' sel' : ''}" data-t="${t}"` +
+        (col ? ` style="--c:${col};--ink:${inkOf(col)}"` : '') + ` aria-pressed="${sel.includes(t)}" aria-label="Token ${t}${p ? ', at ' + placeText(draft, p) : ''}">${t}${lab ? `<small>${lab}</small>` : ''}</button>`;
+    }
+    // Tokens on the board beyond the total (total lowered later) still show.
+    const extra = [...Object.values(draft.assign), ...draft.deskTokens].filter(t => t > total).sort((p, q) => p - q);
+    extra.forEach(t => {
+      const p = placeOf(draft, t), col = placeColor(draft, p);
+      html += `<button class="tk-b on${sel.includes(t) ? ' sel' : ''}" data-t="${t}" style="--c:${col};--ink:${inkOf(col)}">${t}<small>${p.kind === 'd' ? 'FD' : stationLabel(draft, p.id)}</small></button>`;
+    });
+    $('tgrid').innerHTML = html;
+
+    // selection bar
+    const sb = $('selbar');
+    if(!sel.length){
+      sb.innerHTML = '<span class="hint">Tap one or more tokens, then tap a station or Front Desk. Tap a placed token to move it or take it off.</span>';
+    }else{
+      const placed = sel.filter(t => placeOf(draft, t));
+      const one = sel.length === 1 && placed.length === 1 ? placeText(draft, placeOf(draft, sel[0])) : '';
+      sb.innerHTML = '<span>Selected:</span>' + sel.map(t => `<span class="chip">${t}</span>`).join('') +
+        (one ? `<span class="hint">now at ${esc(one)}</span>` : '') +
+        `<span class="sp"></span>` + (placed.length ? `<button class="btn sm danger" id="rmSel">Take off board</button>` : '') +
+        `<span class="hint">${sel.length > 1 ? 'Each station tap uses the next one.' : 'Now tap where it goes.'}</span>`;
+      const rb = $('rmSel'); if(rb) rb.onclick = removeSel;
+    }
+
+    // destinations
+    const ready = sel.length > 0;
+    const tables = draft.tables.slice().sort((p, q) => p.num - q.num);
+    $('dest').innerHTML = (tables.length ? tables.map(t => `<div class="dt" style="--c:${t.color}"><div class="dt-h"><i></i>Table ${t.num}</div><div class="sts-b">` +
+      t.stations.map((s, k) => {
+        const tok = draft.assign[s.id], pend = tok !== pub.assign[s.id];
+        return `<button class="st-b${s.brk ? ' brk' : ''}${pend ? ' pend' : ''}${ready && !s.brk ? ' ready' : ''}" data-s="${s.id}" aria-label="Station ${t.num}${LETTERS[k]}">` +
+          `<span class="l">${t.num}${LETTERS[k]}</span>` +
+          (s.brk ? '<span class="v e">Break</span>' : tok != null ? `<span class="v">${tok}</span>` : '<span class="v e">free</span>') + '</button>';
+      }).join('') + (t.stations.length ? '' : '<span class="hint">No stations — add some in Setup</span>') + '</div></div>').join('')
+      : '<p class="hint">No tables yet — add them in Setup.</p>') +
+      `<div class="dt desk-b"><div class="row"><div class="dt-h" style="margin:0;--c:var(--marigold)"><i></i>Front Desk</div><span class="sp" style="flex:1"></span>` +
+      `<button class="btn sm pri" id="toDesk" ${ready ? '' : 'disabled style="opacity:.45"'}>Send selected here</button></div>` +
+      `<div class="dchips">${draft.deskTokens.map(t => `<button data-t="${t}" class="${!pub.deskTokens.includes(t) ? 'pend' : ''}${sel.includes(t) ? ' sel' : ''}">${t}</button>`).join('') || '<span class="hint">No tokens at the desk</span>'}</div></div>`;
+    const td = $('toDesk'); if(td) td.onclick = () => { if(sel.length) toDesk(); };
+
+    // draft list
+    const ch = diff(pub, draft);
+    $('draft').innerHTML = ch.length ? ch.map(c => `<div class="di"><span class="k ${c.k}">${{add:'New', mov:'Move', rem:'Off', set:'Setup'}[c.k]}</span><span class="t">${esc(c.text)}</span>` +
+      (c.tok != null ? `<button class="x" data-undo="${c.tok}" aria-label="Undo this change">✕</button>` : '') + '</div>').join('')
+      : '<div class="empty-note">Nothing waiting. Changes you make appear here until you press Display.</div>';
+    $('discard').disabled = !ch.length; $('discard').style.opacity = ch.length ? 1 : .45;
+    renderStatus();
+  }
+
+  /* ── setup tab ── */
+  function freeCell(){
+    for(let y = 0; y < draft.rows; y++) for(let x = 0; x < draft.cols; x++)
+      if(!occupant(x, y)) return {x, y};
+    draft.rows = Math.min(10, draft.rows + 1);
+    return {x:0, y:draft.rows - 1};
+  }
+  function occupant(x, y){
+    if(draft.desk.x === x && draft.desk.y === y) return 'desk';
+    const t = draft.tables.find(t => t.x === x && t.y === y);
+    return t ? t.id : null;
+  }
+  function renderSetup(){
+    const fT = $('fTitle'), fN = $('fTotal');
+    if(document.activeElement !== fT) fT.value = draft.title;
+    if(document.activeElement !== fN) fN.value = draft.total;
+    if(document.activeElement !== $('fCols')) $('fCols').value = draft.cols;
+    if(document.activeElement !== $('fRows')) $('fRows').value = draft.rows;
+
+    const tables = draft.tables;
+    $('tlist').innerHTML = tables.length ? tables.map(t => `<div class="tbl" style="--c:${t.color}" data-id="${t.id}">
+      <div class="tbl-h"><b>Table</b><input type="number" inputmode="numeric" min="0" max="999" value="${t.num}" data-num aria-label="Table number">
+        <span class="sp"></span>
+        <button class="btn sm" data-st="-" ${t.stations.length ? '' : 'disabled'}>− Station</button>
+        <button class="btn sm" data-st="+" ${t.stations.length >= 26 ? 'disabled' : ''}>+ Station</button>
+        <button class="btn sm danger" data-del>Remove</button></div>
+      <div class="sw" role="group" aria-label="Colour">${PALETTE.map(p => `<button style="--c:${p.c}" data-col="${p.c}" aria-pressed="${p.c === t.color}" aria-label="Colour ${p.c}"></button>`).join('')}</div>
+      <div class="stl">${t.stations.map((s, k) => `<button class="s${s.brk ? ' brk' : ''}" data-brk="${s.id}">${t.num}${LETTERS[k]}<small>${s.brk ? 'On break' : (draft.assign[s.id] != null ? 'Token ' + draft.assign[s.id] : 'Open')}</small></button>`).join('') || '<span class="hint">No stations yet</span>'}</div>
+    </div>`).join('') : '<p class="hint">No tables yet.</p>';
+    const nums = tables.map(t => t.num), dup = nums.filter((n, i) => nums.indexOf(n) !== i);
+    if(dup.length) $('tlist').insertAdjacentHTML('afterbegin', `<div class="banner warn" style="margin:0">Two tables share number ${[...new Set(dup)].join(', ')} — guests could be confused.</div>`);
+    renderMap();
+  }
+  function renderMap(){
+    const ed = $('mapEd');
+    ed.style.gridTemplateColumns = `repeat(${draft.cols}, minmax(64px,1fr))`;
+    let h = '';
+    for(let y = 0; y < draft.rows; y++) for(let x = 0; x < draft.cols; x++) h += `<div class="cell" data-x="${x}" data-y="${y}"></div>`;
+    ed.innerHTML = h;
+    requestAnimationFrame(() => {
+      const pieces = draft.tables.map(t => `<div class="piece" data-p="${t.id}" style="--c:${t.color};--ink:${inkOf(t.color)}">Table ${t.num}<small>${t.stations.length} station${t.stations.length === 1 ? '' : 's'}</small></div>`).join('') +
+        `<div class="piece desk" data-p="desk">Front<br>Desk</div>`;
+      ed.insertAdjacentHTML('beforeend', pieces);
+      placePieces();
+    });
+  }
+  function cellRect(x, y){
+    const c = $('mapEd').querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+    return c ? {l: c.offsetLeft, t: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight} : null;
+  }
+  function placePieces(){
+    $('mapEd').querySelectorAll('.piece').forEach(p => {
+      const id = p.dataset.p, o = id === 'desk' ? draft.desk : draft.tables.find(t => t.id === id);
+      const r = o && cellRect(o.x, o.y);
+      if(!r){ p.style.display = 'none'; return; }
+      Object.assign(p.style, {display:'flex', left: r.l + 'px', top: r.t + 'px', width: r.w + 'px', height: r.h + 'px'});
+    });
+  }
+  window.addEventListener('resize', () => { if(!$('tabSetup').hidden) placePieces(); });
+
+  // Drag on the grid (pointer events → works with mouse and touch)
+  (function dragging(){
+    const ed = $('mapEd');
+    let drag = null;
+    ed.addEventListener('pointerdown', e => {
+      const p = e.target.closest('.piece'); if(!p) return;
+      e.preventDefault(); p.setPointerCapture(e.pointerId);
+      drag = {p, id: p.dataset.p, sx: e.clientX, sy: e.clientY, l: p.offsetLeft, t: p.offsetTop, hot: null};
+      p.classList.add('drag');
+    });
+    ed.addEventListener('pointermove', e => {
+      if(!drag) return;
+      drag.p.style.left = (drag.l + e.clientX - drag.sx) + 'px';
+      drag.p.style.top  = (drag.t + e.clientY - drag.sy) + 'px';
+      drag.p.style.pointerEvents = 'none';
+      const c = document.elementsFromPoint(e.clientX, e.clientY).find(el => el.classList && el.classList.contains('cell') && ed.contains(el));
+      if(drag.hot && drag.hot !== c) drag.hot.classList.remove('hot');
+      drag.hot = c || null; if(c) c.classList.add('hot');
+    });
+    const end = () => {
+      if(!drag) return;
+      const {p, id, hot} = drag; drag = null;
+      p.classList.remove('drag'); p.style.pointerEvents = '';
+      if(hot){
+        hot.classList.remove('hot');
+        const x = +hot.dataset.x, y = +hot.dataset.y;
+        const me = id === 'desk' ? draft.desk : draft.tables.find(t => t.id === id);
+        const other = occupant(x, y);
+        if(other && other !== id){
+          const o = other === 'desk' ? draft.desk : draft.tables.find(t => t.id === other);
+          o.x = me.x; o.y = me.y;
+        }
+        me.x = x; me.y = y;
+        commit(); return;
+      }
+      placePieces();
+    };
+    ed.addEventListener('pointerup', end);
+    ed.addEventListener('pointercancel', end);
+  })();
+
+  /* ── wiring ── */
+  $('tgrid').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if(b) toggleSel(+b.dataset.t); });
+  $('dest').addEventListener('click', e => {
+    const s = e.target.closest('[data-s]');
+    if(s){
+      if(sel.length) return toStation(s.dataset.s);
+      const tok = draft.assign[s.dataset.s];
+      if(tok != null){ sel = [tok]; renderCall(); }
+      return;
+    }
+    const d = e.target.closest('.dchips [data-t]'); if(d) toggleSel(+d.dataset.t);
+  });
+  $('draft').addEventListener('click', e => { const b = e.target.closest('[data-undo]'); if(b) revertToken(+b.dataset.undo); });
+  $('selClear').onclick = () => { sel = []; renderCall(); };
+  $('discard').onclick = () => confirmBox('Discard all draft changes?', 'The draft goes back to exactly what is on the screen now.', 'Discard', () => { draft = clone(pub); sel = []; commit(); });
+  function parseQuery(v){
+    const out = [];
+    v.split(/[\s,]+/).filter(Boolean).forEach(part => {
+      const m = /^(\d+)\s*-\s*(\d+)$/.exec(part);
+      if(m){ let a = +m[1], b = +m[2]; if(a > b) [a, b] = [b, a]; for(let i = a; i <= Math.min(b, a + 100); i++) out.push(i); }
+      else if(/^\d+$/.test(part)) out.push(+part);
+    });
+    return out.filter(t => t >= 1 && t <= Math.max(draft.total, 99999));
+  }
+  function runQuery(){
+    const ts = parseQuery($('q').value);
+    if(!ts.length) return toast('Type a token number, e.g. 46 or 41-45');
+    ts.forEach(t => { if(!sel.includes(t)) sel.push(t); });
+    $('q').value = '';
+    renderCall();
+    const b = $('tgrid').querySelector(`[data-t="${ts[0]}"]`); if(b) b.scrollIntoView({block:'nearest'});
+  }
+  $('q').addEventListener('keydown', e => { if(e.key === 'Enter') runQuery(); });
+  // The search field accepts ranges like "41-45", so it is not type=number.
+  $('q').addEventListener('input', () => { $('q').value = $('q').value.replace(/[^0-9,\-\s]/g, ''); });
+  $('qGo').onclick = runQuery;
+  $('goBtn').onclick = display;
+  $('undoBtn').onclick = () => confirmBox('Undo the last Display?', 'The screen goes back to how it was before. Those changes stay in your draft so you can fix them and display again.', 'Undo', undo);
+  $('cLock').onclick = () => confirmBox('Lock this device?', 'Your draft stays saved here. You will need the PIN to open it again.', 'Lock', lock);
+
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-selected', x === b));
+    const setup = b.dataset.tab === 'setup';
+    $('tabCall').hidden = setup; $('tabSetup').hidden = !setup;
+    setup ? renderSetup() : renderCall();
+    window.scrollTo(0, 0);
+  });
+
+  $('fTitle').addEventListener('input', e => { draft.title = e.target.value.slice(0, 70) || CONFIG.TITLE; save(); $('cTitle').textContent = draft.title; renderStatus(); });
+  $('fTitle').addEventListener('change', () => commit());
+  $('fTotal').addEventListener('change', e => { draft.total = Math.min(2000, Math.max(1, parseInt(e.target.value, 10) || draft.total)); commit(); });
+  $('fCols').addEventListener('change', e => resizeGrid(+e.target.value, draft.rows));
+  $('fRows').addEventListener('change', e => resizeGrid(draft.cols, +e.target.value));
+  function resizeGrid(c, r){
+    const items = draft.tables.concat([draft.desk]);
+    const needC = Math.max(...items.map(i => i.x)) + 1, needR = Math.max(...items.map(i => i.y)) + 1;
+    if((c || 1) < needC || (r || 1) < needR) toast('Move pieces inward before making the plan smaller');
+    c = Math.min(14, Math.max(needC, c || 1)); r = Math.min(10, Math.max(needR, r || 1));
+    draft.cols = c; draft.rows = r; commit();
+  }
+
+  $('addTable').onclick = () => {
+    const used = new Set(draft.tables.map(t => t.color));
+    const col = (PALETTE.find(p => !used.has(p.c)) || PALETTE[draft.tables.length % PALETTE.length]).c;
+    const num = draft.tables.reduce((m, t) => Math.max(m, t.num), 0) + 1;
+    const cell = freeCell();
+    draft.tables.push({ id: uid('t'), num, color: col, x: cell.x, y: cell.y, stations: [0,1,2].map(() => ({id: uid('s'), brk:false})) });
+    commit(); toast(`Table ${num} added with 3 stations`);
+  };
+  $('tlist').addEventListener('click', e => {
+    const box = e.target.closest('.tbl'); if(!box) return;
+    const t = draft.tables.find(x => x.id === box.dataset.id); if(!t) return;
+    const b = e.target.closest('button'); if(!b) return;
+    if(b.dataset.col){ t.color = b.dataset.col; commit(); }
+    else if(b.dataset.st === '+'){ t.stations.push({id: uid('s'), brk:false}); commit(); }
+    else if(b.dataset.st === '-'){
+      const s = t.stations[t.stations.length - 1];
+      const go = () => { delete draft.assign[s.id]; t.stations.pop(); commit(); };
+      draft.assign[s.id] != null
+        ? confirmBox(`Remove station ${t.num}${LETTERS[t.stations.length - 1]}?`, `Token ${draft.assign[s.id]} is there and will be taken off the board.`, 'Remove', go)
+        : go();
+    }
+    else if(b.dataset.brk){
+      const s = t.stations.find(x => x.id === b.dataset.brk);
+      s.brk = !s.brk;
+      if(s.brk && draft.assign[s.id] != null){ toast(`Token ${draft.assign[s.id]} taken off the board`); delete draft.assign[s.id]; }
+      commit();
+    }
+    else if(b.hasAttribute('data-del')){
+      const n = t.stations.filter(s => draft.assign[s.id] != null).length;
+      confirmBox(`Remove Table ${t.num}?`, n ? `${n} token${n > 1 ? 's' : ''} on it will be taken off the board.` : 'It has no tokens on it.', 'Remove', () => {
+        t.stations.forEach(s => delete draft.assign[s.id]);
+        draft.tables = draft.tables.filter(x => x !== t); commit();
+      });
+    }
+  });
+  $('tlist').addEventListener('change', e => {
+    if(!e.target.hasAttribute('data-num')) return;
+    const t = draft.tables.find(x => x.id === e.target.closest('.tbl').dataset.id);
+    const n = parseInt(e.target.value, 10);
+    if(t && Number.isFinite(n) && n >= 0) t.num = Math.min(999, n);
+    commit();
+  });
+
+  $('clrTokens').onclick = () => confirmBox('Clear all tokens?', 'Every token comes off the board (in the draft). Tables, stations and the map stay. Press Display to update the screen.', 'Clear tokens', () => {
+    draft.assign = {}; draft.deskTokens = []; sel = []; commit(); toast('Tokens cleared in the draft — press Display');
+  });
+  $('clrAll').onclick = () => confirmBox('Reset everything?', 'Removes all tables, stations, the map and tokens (in the draft). Consider exporting the layout first. Press Display to update the screen.', 'Reset everything', () => {
+    const keep = draft.title; draft = emptyBoard(); draft.title = keep; sel = []; commit(); toast('Everything reset in the draft — press Display');
+  });
+  $('exp').onclick = () => {
+    const data = { app:'mehndi-tokens', v:1, saved: new Date().toISOString(),
+      layout: { title: draft.title, total: draft.total, cols: draft.cols, rows: draft.rows, desk: draft.desk, tables: draft.tables } };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}));
+    a.download = 'mehndi-layout.json'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  $('imp').onclick = () => $('impFile').click();
+  $('impFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if(!f) return;
+    try{
+      const j = JSON.parse(await f.text());
+      if(!j || j.app !== 'mehndi-tokens' || !j.layout) throw new Error('not a layout file');
+      const L = normBoard(Object.assign({}, j.layout, {assign:{}, deskTokens:[]}));
+      confirmBox('Load this layout?', `${L.tables.length} tables. Tokens on stations that still exist are kept; the rest come off the board. Press Display to update the screen.`, 'Load', () => {
+        const sids = new Set(); L.tables.forEach(t => t.stations.forEach(s => sids.add(s.id)));
+        const assign = {}; Object.keys(draft.assign).forEach(k => { if(sids.has(k)) assign[k] = draft.assign[k]; });
+        Object.assign(draft, {title: L.title, total: L.total, cols: L.cols, rows: L.rows, desk: L.desk, tables: L.tables, assign});
+        commit(); toast('Layout loaded into the draft');
+      });
+    }catch(err){ toast('That file is not a Mehndi Tokens layout'); }
+  };
+
+  // Keyboard: Enter in search selects; Ctrl/⌘+Enter displays.
+  document.addEventListener('keydown', e => {
+    if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); if(!$('goBtn').disabled) display(); }
+    else if(e.key === 'Escape' && sel.length){ sel = []; renderCall(); }
+  });
+  // Another tab of the controller on this device.
+  window.addEventListener('storage', e => {
+    if(e.key === 'mehndi_ctl_pub' || e.key === 'mehndi_ctl_draft'){
+      pub = normBoard(LS.get('ctl_pub', null)); draft = normBoard(LS.get('ctl_draft', null) || pub); renderAll();
+    }
+  });
+
+  function renderAll(){ $('tabSetup').hidden ? renderCall() : (renderSetup(), renderStatus()); }
+  save(); renderCall();
+  if(!window.Peer) toast('Running in same-device mode (PeerJS did not load)');
+}
+
+/* ═════════════ shared bits ═════════════ */
+function confirmBox(title, text, yes, fn){
+  const d = $('dlg');
+  $('dlgT').textContent = title; $('dlgP').textContent = text; $('dlgYes').textContent = yes;
+  $('dlgYes').onclick = () => { d.close(); fn(); };
+  $('dlgNo').onclick = () => d.close();
+  d.showModal();
+}
+let toastT;
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* boot */
+// This tab's role first (a laptop may run Screen and Control side by side),
+// then whatever this device last unlocked.
+let role = null;
+try{ role = sessionStorage.getItem('mehndi_role'); }catch(e){}
+if(!role) role = LS.get('role', null);
+if(role === 'screen' || role === 'control') start(role); else showGate();
+})();
+</script>
+</body>
+</html>
