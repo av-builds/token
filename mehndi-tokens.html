@@ -1,256 +1,316 @@
 <!DOCTYPE html>
 <!--
   Mehndi Token Board — one file, two views.
-    PIN 7868 → Screen  (the venue TV; it is also the hub the controller connects to)
+    PIN 7868 → Screen  (the venue TV)
     PIN 6879 → Control (the main table: set up tables/stations/map, assign tokens, press Display)
 
-  Hosting: drop this file in a GitHub Pages repo (as index.html or any name).
-  Open the Screen first, then the Control panel on the main table's phone/laptop.
+  Hosting: put this file in a GitHub Pages repo (as index.html or any name).
 
-  Sync is peer-to-peer (PeerJS public broker) — no accounts, no backend.
-  Two tabs in the same browser also sync with no internet at all.
+  Connection: both devices connect OUT to free public MQTT relay servers over
+  secure WebSockets (three of them at once, for redundancy). The latest board
+  is kept on the relay, so a screen that opens or reloads gets it instantly.
+  Works on any Wi-Fi or mobile data. Tabs in the same browser also sync
+  directly, even with no internet.
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#16051F">
+<meta name="theme-color" content="#14041C">
 <title>Mehndi Tokens</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Yatra+One&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>window.mqtt || document.write('<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"><\/script>');</script>
 <style>
 :root{
-  --bg:#16051F; --bg2:#22082F; --panel:#2C0C3D; --panel2:#3A1450;
-  --line:rgba(255,182,39,.22); --line2:rgba(255,255,255,.10);
-  --magenta:#E5257D; --marigold:#FFB627; --saffron:#FF7A1A; --emerald:#12B886;
-  --cream:#FFF4DC; --muted:#C9A8D6; --dim:#8E6E9E; --danger:#F25F5C; --go:#16C172;
-  --r:14px;
+  --bg:#14041C; --surface:#200830; --surface-2:#2B0E3E; --surface-3:#391550;
+  --border:rgba(255,255,255,.08); --border-2:rgba(255,255,255,.14); --border-gold:rgba(255,182,39,.28);
+  --gold:#FFB627; --gold-2:#FFD36B; --saffron:#FF7A1A; --magenta:#E5257D; --emerald:#12B886;
+  --text:#FFF4DC; --muted:#C7A6D4; --dim:#8A6A9A;
+  --ok:#18C77A; --ok-ink:#03240F; --warn:#FFB627; --bad:#F25F5C;
+  --r-sm:8px; --r:12px; --r-lg:18px;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;}
-body{background:var(--bg);color:var(--cream);font-family:'Archivo',system-ui,sans-serif;
-  font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent;
-  background-image:radial-gradient(ellipse at 50% 0%,rgba(229,37,125,.18),transparent 55%),
-                   radial-gradient(ellipse at 0% 100%,rgba(255,122,26,.14),transparent 50%);
+body{background:var(--bg);color:var(--text);font-family:'Archivo',system-ui,sans-serif;font-size:15px;
+  font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(229,37,125,.20),transparent 60%),
+                   radial-gradient(ellipse 60% 40% at 0% 110%,rgba(255,122,26,.13),transparent 60%),
+                   radial-gradient(ellipse 50% 40% at 100% 100%,rgba(18,184,134,.08),transparent 60%);
   background-attachment:fixed;}
 button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;}
 button:disabled{cursor:not-allowed;}
-:focus-visible{outline:3px solid var(--marigold);outline-offset:2px;}
-input,select{font:inherit;color:inherit;}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px;}
+input{font:inherit;color:inherit;}
 [hidden]{display:none !important;}
-.lattice{position:fixed;inset:0;opacity:.06;pointer-events:none;z-index:0;
+.serif{font-family:'Yatra One',serif;font-weight:400;}
+.lattice{position:fixed;inset:0;opacity:.055;pointer-events:none;z-index:0;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%23FFB627' stroke-width='1.2'%3E%3Cpath d='M40 4c8 12 8 24 0 36-8-12-8-24 0-36zM40 76c8-12 8-24 0-36-8 12-8 24 0 36zM4 40c12-8 24-8 36 0-12 8-24 8-36 0zM76 40c-12-8-24-8-36 0 12 8 24 8 36 0z'/%3E%3Ccircle cx='40' cy='40' r='4'/%3E%3Ccircle cx='0' cy='0' r='6'/%3E%3Ccircle cx='80' cy='0' r='6'/%3E%3Ccircle cx='0' cy='80' r='6'/%3E%3Ccircle cx='80' cy='80' r='6'/%3E%3C/g%3E%3C/svg%3E");
   background-size:80px 80px;}
-.title-font{font-family:'Yatra One',serif;font-weight:400;}
+.divider{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--gold);}
+.divider::before,.divider::after{content:'';height:1px;width:min(120px,18vw);background:linear-gradient(90deg,transparent,var(--gold));}
+.divider::after{background:linear-gradient(90deg,var(--gold),transparent);}
+.divider i{width:8px;height:8px;transform:rotate(45deg);background:var(--gold);box-shadow:0 0 0 3px rgba(255,182,39,.18);}
 
 /* ═════════════ PIN GATE ═════════════ */
-#gate{position:relative;z-index:1;min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px;}
-.gate-card{width:100%;max-width:360px;text-align:center;}
-.gate-card h1{font-size:30px;line-height:1.15;color:var(--marigold);margin-bottom:6px;text-shadow:0 4px 18px rgba(255,122,26,.35);}
-.gate-card p{color:var(--muted);font-size:15px;font-weight:500;margin-bottom:26px;}
-.dots{display:flex;justify-content:center;gap:14px;margin-bottom:26px;}
-.dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--marigold);transition:background .15s;}
-.dots i.on{background:var(--marigold);}
+#gate{position:relative;z-index:1;min-height:100%;display:flex;align-items:center;justify-content:center;padding:28px 16px;}
+.gate-card{width:100%;max-width:380px;text-align:center;padding:30px 26px 26px;border-radius:24px;
+  background:linear-gradient(180deg,rgba(43,14,62,.92),rgba(32,8,48,.92));border:1px solid var(--border-gold);box-shadow:0 30px 80px rgba(0,0,0,.5);}
+.mandala{width:76px;height:76px;margin:0 auto 14px;display:block;animation:spin 60s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.gate-card h1{font-size:27px;line-height:1.2;color:var(--gold);text-shadow:0 4px 18px rgba(255,122,26,.35);}
+.gate-card .divider{margin:14px 0 18px;}
+.gate-card .lede{color:var(--muted);font-size:14px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-bottom:16px;}
+.dots{display:flex;justify-content:center;gap:16px;margin-bottom:24px;}
+.dots i{width:15px;height:15px;border-radius:50%;border:2px solid var(--gold);transition:background .15s,transform .15s;}
+.dots i.on{background:var(--gold);transform:scale(1.1);}
 .dots.shake{animation:shake .4s;}
+.dots.ok i{background:var(--ok);border-color:var(--ok);}
 @keyframes shake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
-.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
-.pad button{height:68px;border-radius:18px;background:var(--panel);border:1px solid var(--line2);font-size:26px;font-weight:800;transition:background .12s,transform .08s;}
-.pad button:active{background:var(--panel2);transform:scale(.96);}
-.pad .ghost{background:none;border-color:transparent;font-size:15px;color:var(--muted);font-weight:700;}
-.gate-err{min-height:22px;margin-top:16px;color:var(--danger);font-weight:700;font-size:14px;}
-.gate-hint{margin-top:10px;color:var(--dim);font-size:12.5px;font-weight:500;}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:288px;margin:0 auto;}
+.pad button{aspect-ratio:1.25;border-radius:18px;background:var(--surface-3);border:1px solid var(--border);font-size:26px;font-weight:800;transition:background .12s,transform .08s;}
+.pad button:hover{background:#45195F;}
+.pad button:active{transform:scale(.94);}
+.pad .ghost{background:none;border-color:transparent;font-size:14px;color:var(--muted);font-weight:700;}
+.gate-err{min-height:20px;margin-top:16px;color:var(--bad);font-weight:700;font-size:14px;}
+.gate-hint{margin-top:6px;color:var(--dim);font-size:12.5px;font-weight:500;}
 
 /* ═════════════ SCREEN ═════════════ */
-#screen{position:fixed;inset:0;z-index:1;display:grid;grid-template-rows:auto auto 1fr;gap:1.6vh;padding:2.4vh 2vw 2vh;overflow:hidden;}
+#screen{position:fixed;inset:0;z-index:1;display:grid;grid-template-rows:auto auto 1fr;gap:1.8vh;padding:2.6vh 2vw 2.2vh;overflow:hidden;}
 #screen.idle{cursor:none;}
 .toran{position:absolute;top:0;left:0;right:0;height:3.6vh;display:flex;justify-content:space-around;pointer-events:none;}
-.toran i{display:block;width:1.8vh;height:1.8vh;border-radius:50%;margin-top:-.4vh;
-  background:radial-gradient(circle at 40% 35%,#FFD36B,var(--marigold) 45%,var(--saffron));}
+.toran i{display:block;width:1.7vh;height:1.7vh;border-radius:50%;margin-top:-.4vh;
+  background:radial-gradient(circle at 40% 35%,#FFD36B,var(--gold) 45%,var(--saffron));}
 .toran i:nth-child(3n+2){background:radial-gradient(circle at 40% 35%,#FF8FBF,var(--magenta) 55%,#A0124F);margin-top:.4vh;}
 .toran i:nth-child(3n){margin-top:1vh;}
-.s-head{text-align:center;padding-top:1.2vh;}
-.s-head h1{font-size:clamp(22px,5.6vh,76px);line-height:1.05;color:var(--marigold);text-shadow:0 .4vh 2vh rgba(255,122,26,.35);}
-.s-strip{display:flex;align-items:center;gap:1.2vw;min-height:7.5vh;padding:.8vh 1.2vw;border-radius:1.6vh;
-  background:linear-gradient(90deg,rgba(229,37,125,.22),rgba(255,122,26,.12));border:1px solid rgba(229,37,125,.35);overflow:hidden;}
-.s-strip .lbl{flex-shrink:0;font-size:clamp(11px,1.9vh,24px);font-weight:900;letter-spacing:.22em;text-transform:uppercase;color:var(--marigold);font-stretch:110%;line-height:1.15;}
-.s-strip .items{display:flex;flex-wrap:wrap;gap:2vh .9vw;overflow:hidden;flex:1;height:6.2vh;align-items:center;align-content:flex-start;}
-.s-strip .empty{color:var(--muted);font-weight:600;font-size:clamp(12px,2.2vh,28px);}
-.jc{display:flex;align-items:center;gap:.6vw;flex-shrink:0;padding:.5vh 1vw;border-radius:1.2vh;background:rgba(0,0,0,.25);
-  font-size:clamp(14px,3.6vh,48px);font-weight:900;font-stretch:85%;white-space:nowrap;}
-.jc .ar{color:var(--muted);font-size:.7em;}
-.jc .to{padding:.1vh .7vw;border-radius:.8vh;color:#1A0620;font-size:.8em;}
+.s-head{text-align:center;padding-top:1.4vh;}
+.s-head h1{font-size:clamp(22px,5.4vh,76px);line-height:1.05;color:var(--gold);text-shadow:0 .4vh 2vh rgba(255,122,26,.35);}
+.s-head .divider{margin-top:.8vh;}
+.s-head .divider::before,.s-head .divider::after{width:16vw;}
+.s-strip{display:flex;align-items:center;gap:1.4vw;height:8vh;padding:0 1.2vw;border-radius:1.8vh;
+  background:linear-gradient(90deg,rgba(229,37,125,.24),rgba(255,122,26,.10) 60%,rgba(255,182,39,.06));border:1px solid rgba(229,37,125,.35);overflow:hidden;}
+.s-strip .lbl{flex-shrink:0;font-size:clamp(10px,1.8vh,24px);font-weight:900;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-stretch:112%;line-height:1.2;
+  padding-right:1.4vw;border-right:1px solid rgba(255,182,39,.3);}
+.s-strip .items{display:flex;flex-wrap:wrap;gap:3vh .8vw;overflow:hidden;flex:1;height:5.8vh;align-content:flex-start;}
+.s-strip .empty{color:var(--muted);font-weight:600;font-size:clamp(12px,2.3vh,30px);line-height:5.8vh;}
+.jc{display:flex;align-items:center;gap:.55vw;flex-shrink:0;height:5.8vh;padding:0 .9vw 0 1vw;border-radius:1.3vh;background:rgba(0,0,0,.28);border:1px solid var(--border);
+  font-size:clamp(14px,3.5vh,48px);font-weight:900;font-stretch:85%;white-space:nowrap;}
+.jc:first-child{background:rgba(255,182,39,.14);border-color:var(--border-gold);}
+.jc .ar{color:var(--muted);font-size:.65em;}
+.jc .to{padding:.15vh .6vw;border-radius:.8vh;color:var(--ink,#1A0620);font-size:.78em;}
 .jc.new{animation:chipIn .6s ease both;}
 @keyframes chipIn{from{opacity:0;transform:translateY(-1vh) scale(.9)}}
-.s-map{position:relative;display:grid;gap:1.4vh 1vw;min-height:0;}
+.s-map{position:relative;display:grid;gap:1.6vh 1.1vw;min-height:0;}
 .s-wait{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;text-align:center;}
-.s-wait .big{font-size:clamp(36px,10vh,140px);color:var(--marigold);}
+.s-wait .big{font-size:clamp(36px,11vh,150px);color:var(--gold);text-shadow:0 1vh 4vh rgba(255,122,26,.35);}
 .s-wait .small{font-size:clamp(14px,3vh,40px);color:var(--muted);font-weight:700;}
-.card{position:relative;container-type:size;display:flex;flex-direction:column;min-width:0;min-height:0;border-radius:1.6vh;overflow:hidden;
-  background:rgba(44,12,61,.92);border:.35vh solid var(--c);box-shadow:0 1vh 3vh rgba(0,0,0,.35);}
-.card .hd{flex:0 0 auto;background:var(--c);color:var(--ink);text-align:center;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
-  font-size:clamp(10px,min(13cqh,12cqw),60px);padding:1.5cqh 2cqw;line-height:1.1;font-stretch:105%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card{position:relative;container-type:size;display:flex;flex-direction:column;min-width:0;min-height:0;border-radius:1.8vh;overflow:hidden;
+  background:linear-gradient(180deg,rgba(57,21,80,.95),rgba(36,9,52,.95));border:.3vh solid color-mix(in srgb,var(--c) 75%,transparent);
+  box-shadow:0 1.2vh 3vh rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);}
+.card .hd{flex:0 0 auto;background:linear-gradient(180deg,color-mix(in srgb,var(--c) 88%,#fff),var(--c));color:var(--ink);text-align:center;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+  font-size:clamp(10px,min(12cqh,11cqw),60px);padding:1.6cqh 2cqw;line-height:1.1;font-stretch:108%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .card .sts{flex:1;display:grid;grid-template-rows:repeat(var(--n),1fr);min-height:0;}
-.st{display:flex;align-items:center;gap:4cqw;padding:0 5cqw;min-height:0;border-top:1px solid var(--line2);position:relative;}
+.st{display:flex;align-items:center;gap:4cqw;padding:0 5cqw 0 4cqw;min-height:0;border-top:1px solid var(--border);position:relative;}
 .st:first-child{border-top:0;}
-.st .lt{flex:0 0 auto;font-size:calc(min(42cqh / var(--n), 13cqw));font-weight:900;color:var(--c);min-width:1.1em;text-align:center;}
+.st .lt{flex:0 0 auto;display:grid;place-items:center;width:calc(min(46cqh / var(--n), 15cqw));aspect-ratio:1;border-radius:50%;
+  background:color-mix(in srgb,var(--c) 22%,transparent);color:var(--c);font-size:calc(min(28cqh / var(--n), 9cqw));font-weight:900;}
 .st .tk{flex:1;text-align:right;font-size:calc(min(62cqh / var(--n), 30cqw));font-weight:900;font-stretch:82%;line-height:1;color:#fff;}
-.st .tk.none{color:var(--dim);font-weight:700;}
-.st.brk .tk{color:var(--dim);font-size:calc(min(34cqh / var(--n), 16cqw));text-transform:uppercase;letter-spacing:.1em;font-weight:800;}
-.st.brk .lt{opacity:.45;}
-.st.glow{background:color-mix(in srgb,var(--c) 26%,transparent);}
-.st.glow::after,.dk.glow::after{content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 .4vh var(--c);animation:glow 1.5s ease-in-out 5;}
-@keyframes glow{50%{opacity:.15}}
-.pop{animation:pop .9s cubic-bezier(.2,1.6,.4,1);}
+.st .tk.none{color:rgba(255,255,255,.16);font-weight:700;}
+.st.brk .tk{color:var(--dim);font-size:calc(min(30cqh / var(--n), 13cqw));text-transform:uppercase;letter-spacing:.12em;font-weight:800;}
+.st.brk .lt{opacity:.4;}
+.st.glow{background:color-mix(in srgb,var(--c) 24%,transparent);}
+.st.glow::after,.dk.glow::after{content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 .4vh var(--c);animation:glow 1.5s ease-in-out 6;}
+@keyframes glow{50%{opacity:.12}}
+.pop{display:inline-block;animation:pop .9s cubic-bezier(.2,1.6,.4,1);}
 @keyframes pop{0%{transform:scale(.4);opacity:0;filter:blur(6px)}60%{opacity:1;filter:none}100%{transform:scale(1)}}
-.card.desk{--c:var(--marigold);--ink:#2A0A12;}
-.desk .dks{flex:1;display:grid;grid-template-columns:repeat(var(--dc),1fr);grid-auto-rows:1fr;gap:2cqh 2cqw;padding:3cqh 3cqw;min-height:0;align-content:center;}
-.dk{position:relative;display:flex;align-items:center;justify-content:center;border-radius:1vh;background:rgba(255,182,39,.12);
-  font-weight:900;font-stretch:82%;color:#fff;font-size:var(--dfs);line-height:1;min-height:0;}
-.desk .none{flex:1;display:flex;align-items:center;justify-content:center;color:var(--dim);font-weight:700;font-size:min(12cqh,10cqw);}
+.card.desk{--c:var(--gold);--ink:#2A0A12;}
+.desk .dks{flex:1;display:grid;grid-template-columns:repeat(var(--dc),1fr);grid-auto-rows:1fr;gap:2.4cqh 2.4cqw;padding:3.5cqh 3.5cqw;min-height:0;align-content:center;}
+.dk{position:relative;display:flex;align-items:center;justify-content:center;border-radius:1.2vh;background:rgba(255,182,39,.12);border:1px solid var(--border-gold);
+  font-weight:900;font-stretch:82%;color:#fff;font-size:var(--dfs);line-height:1;min-height:0;overflow:hidden;}
+.desk .none{flex:1;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.16);font-weight:700;font-size:min(14cqh,12cqw);}
 .s-tools{position:fixed;right:1.4vw;bottom:1.4vh;display:flex;gap:8px;align-items:center;z-index:5;transition:opacity .4s;}
-#screen.idle .s-tools{opacity:0;}
-.s-tools button{padding:8px 12px;border-radius:10px;background:rgba(0,0,0,.45);border:1px solid var(--line2);font-size:13px;font-weight:700;color:var(--muted);}
-.cdot{width:11px;height:11px;border-radius:50%;background:var(--emerald);box-shadow:0 0 0 4px rgba(18,184,134,.18);}
-.cdot.warn{background:var(--marigold);box-shadow:0 0 0 4px rgba(255,182,39,.18);}
-.cdot.bad{background:var(--danger);box-shadow:0 0 0 4px rgba(242,95,92,.18);}
-#screen .cdot{position:fixed;left:1vw;bottom:1.2vh;opacity:.7;}
+#screen.idle .s-tools{opacity:0;pointer-events:none;}
+.s-tools button{padding:9px 14px;border-radius:10px;background:rgba(0,0,0,.5);border:1px solid var(--border-2);font-size:13px;font-weight:700;color:var(--muted);}
+.s-net{position:fixed;left:1.2vw;bottom:1.3vh;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 10px;border-radius:999px;
+  background:rgba(0,0,0,.55);border:1px solid var(--border-2);font-size:clamp(11px,1.5vh,16px);font-weight:700;color:var(--muted);}
+.s-net.quiet{background:none;border-color:transparent;opacity:.6;}
+.s-net.quiet span:last-child{display:none;}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--ok);box-shadow:0 0 0 4px rgba(24,199,122,.18);}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 4px rgba(255,182,39,.18);animation:blink 1.4s ease-in-out infinite;}
+.dot.bad{background:var(--bad);box-shadow:0 0 0 4px rgba(242,95,92,.2);}
+@keyframes blink{50%{opacity:.35}}
 
 /* ═════════════ CONTROL ═════════════ */
-#control{position:relative;z-index:1;min-height:100%;padding-bottom:calc(96px + env(safe-area-inset-bottom));}
-.c-top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:10px 16px;
-  background:rgba(22,5,31,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line2);}
-.c-top h1{font-size:17px;color:var(--marigold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
-.conn{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap;}
-.tabs{display:flex;gap:4px;padding:3px;border-radius:12px;background:var(--panel);}
-.tabs button{padding:7px 14px;border-radius:9px;font-size:14px;font-weight:800;color:var(--muted);}
-.tabs button[aria-selected="true"]{background:var(--panel2);color:var(--cream);}
-.iconbtn{padding:7px 10px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted);border:1px solid var(--line2);}
-.banner{margin:12px 16px 0;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-.banner.warn{background:rgba(255,182,39,.12);border:1px solid rgba(255,182,39,.4);}
-.banner.bad{background:rgba(242,95,92,.12);border:1px solid rgba(242,95,92,.45);}
-.banner button{margin-left:auto;padding:7px 12px;border-radius:9px;background:var(--marigold);color:#2A0A12;font-weight:800;font-size:13px;}
-.c-body{max-width:1280px;margin:0 auto;padding:14px 16px;display:grid;gap:14px;}
-@media (min-width:980px){
-  .c-body.call{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start;}
-  .c-body.call .col-r{position:sticky;top:70px;}
+#control{position:relative;z-index:1;min-height:100%;padding-bottom:calc(100px + env(safe-area-inset-bottom));}
+.c-top{position:sticky;top:0;z-index:20;background:rgba(20,4,28,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);}
+.c-top .in{max-width:1320px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px;}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1;}
+.brand svg{width:30px;height:30px;flex-shrink:0;}
+.brand h1{font-size:17px;line-height:1.15;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.brand small{display:block;font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);}
+.pill{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);
+  font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.pill b{color:var(--text);font-weight:800;}
+.tabs{display:flex;gap:3px;padding:3px;border-radius:12px;background:var(--surface);border:1px solid var(--border);}
+.tabs button{padding:7px 16px;border-radius:9px;font-size:14px;font-weight:800;color:var(--muted);transition:background .15s,color .15s;}
+.tabs button[aria-selected="true"]{background:var(--surface-3);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.06) inset;}
+.ghostbtn{padding:8px 12px;border-radius:10px;font-size:13px;font-weight:700;color:var(--muted);border:1px solid var(--border);}
+.ghostbtn:hover{background:var(--surface-2);}
+.banner{max-width:1320px;margin:12px auto 0;padding:0 16px;}
+.banner:empty{display:none;}
+.banner > div{padding:12px 14px;border-radius:var(--r);font-size:14px;font-weight:600;display:flex;gap:12px;align-items:center;flex-wrap:wrap;line-height:1.45;}
+.banner .warn{background:rgba(255,182,39,.10);border:1px solid rgba(255,182,39,.38);}
+.banner .bad{background:rgba(242,95,92,.10);border:1px solid rgba(242,95,92,.45);}
+.banner button{margin-left:auto;padding:8px 14px;border-radius:10px;background:var(--gold);color:#2A0A12;font-weight:800;font-size:13px;}
+.c-body{max-width:1320px;margin:0 auto;padding:14px 16px;display:grid;gap:14px;}
+@media (min-width:1000px){
+  .c-body.call{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start;}
+  .c-body.call .col-r{position:sticky;top:72px;max-height:calc(100vh - 190px);overflow:auto;padding-right:2px;}
 }
-.panel{background:rgba(44,12,61,.85);border:1px solid var(--line2);border-radius:var(--r);padding:16px;min-width:0;}
-.panel h2{font-size:12.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--marigold);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-.panel h2 .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--marigold);color:#2A0A12;font-size:12px;letter-spacing:0;}
-.panel h2 .sp{flex:1;}
+.col{display:grid;gap:14px;align-content:start;min-width:0;}
+.panel{background:linear-gradient(180deg,rgba(43,14,62,.9),rgba(32,8,48,.9));border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;min-width:0;box-shadow:var(--shadow);}
+.ph{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.ph h2{font-size:12.5px;font-weight:900;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);}
+.ph .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--gold);color:#2A0A12;font-size:12.5px;font-weight:900;flex-shrink:0;}
+.ph .sp{flex:1;}
 .hint{color:var(--muted);font-size:13px;font-weight:500;line-height:1.5;}
-.col-r{display:grid;gap:14px;align-content:start;min-width:0;}
-.col-l{display:grid;gap:14px;align-content:start;min-width:0;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:10px;font-weight:800;font-size:14px;background:var(--surface-3);border:1px solid var(--border);transition:background .15s,opacity .15s;}
+.btn:hover:not(:disabled){background:#45195F;}
+.btn:disabled{opacity:.4;}
+.btn.pri{background:var(--gold);color:#2A0A12;border-color:transparent;}
+.btn.pri:hover:not(:disabled){background:var(--gold-2);}
+.btn.danger{background:rgba(242,95,92,.12);color:#FFB3B1;border-color:rgba(242,95,92,.4);}
+.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px;}
 
 .search{display:flex;gap:8px;margin-bottom:12px;}
-.search input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:11px 12px;font-size:16px;font-weight:700;outline:none;}
-.search input:focus{border-color:var(--marigold);}
-.btn{padding:10px 14px;border-radius:10px;font-weight:800;font-size:14px;background:var(--panel2);border:1px solid var(--line2);}
-.btn.pri{background:var(--marigold);color:#2A0A12;border-color:transparent;}
-.btn.danger{background:rgba(242,95,92,.14);color:#FFB3B1;border-color:rgba(242,95,92,.45);}
-.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:8px;}
-.legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--muted);font-weight:600;}
-.legend span{display:inline-flex;align-items:center;gap:6px;}
-.legend i{width:14px;height:14px;border-radius:4px;display:inline-block;}
-.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px;max-height:min(52vh,520px);overflow:auto;padding:2px;overscroll-behavior:contain;}
-.tk-b{position:relative;height:44px;border-radius:9px;background:var(--bg2);border:1px solid var(--line2);font-size:15px;font-weight:800;}
+.search input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border-2);border-radius:10px;padding:11px 13px;font-size:16px;font-weight:700;outline:none;}
+.search input::placeholder{color:var(--dim);font-weight:600;}
+.search input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,182,39,.15);}
+.filters{display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+.chipf{padding:6px 12px;border-radius:999px;border:1px solid var(--border-2);font-size:12.5px;font-weight:800;color:var(--muted);}
+.chipf[aria-pressed="true"]{background:var(--text);color:#2A0A12;border-color:transparent;}
+.chipf .c{opacity:.6;font-weight:700;margin-left:5px;}
+.legend{margin-left:auto;display:flex;gap:12px;font-size:11.5px;color:var(--dim);font-weight:700;}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+.legend i{width:12px;height:12px;border-radius:4px;display:inline-block;}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:6px;max-height:min(50vh,520px);overflow:auto;padding:3px;overscroll-behavior:contain;}
+.tk-b{position:relative;height:46px;border-radius:10px;background:var(--bg);border:1px solid var(--border-2);font-size:15px;font-weight:800;transition:transform .08s;}
+.tk-b:active{transform:scale(.94);}
 .tk-b.on{background:var(--c);color:var(--ink);border-color:transparent;}
-.tk-b.pend{outline:2px dashed var(--cream);outline-offset:-4px;}
-.tk-b.sel{box-shadow:0 0 0 3px var(--cream),0 0 0 6px var(--magenta);z-index:1;}
-.tk-b small{position:absolute;right:3px;bottom:1px;font-size:9px;font-weight:900;opacity:.85;}
-.selbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--bg2);font-size:14px;font-weight:700;min-height:48px;}
+.tk-b.pend::before{content:'';position:absolute;inset:3px;border-radius:7px;border:2px dashed currentColor;opacity:.75;}
+.tk-b.sel{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text);z-index:1;}
+.tk-b.sel:not(.on){background:var(--magenta);color:#fff;border-color:transparent;}
+.tk-b small{position:absolute;right:4px;bottom:2px;font-size:9px;font-weight:900;opacity:.85;}
+.tgrid .none{grid-column:1/-1;padding:16px 4px;}
+.selbar{position:sticky;bottom:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;border-radius:var(--r);
+  background:var(--surface-3);border:1px solid var(--border-2);font-size:14px;font-weight:700;min-height:52px;}
 .selbar .chip{padding:4px 10px;border-radius:8px;background:var(--magenta);color:#fff;font-weight:900;}
 .selbar .sp{flex:1;}
 
 .dest{display:grid;gap:10px;}
-.dt{border-radius:12px;border:1px solid var(--line2);background:var(--bg2);padding:10px;}
+.dt{border-radius:var(--r);border:1px solid var(--border);background:rgba(20,4,28,.55);padding:10px;}
 .dt-h{display:flex;align-items:center;gap:8px;font-weight:900;font-size:14px;margin-bottom:8px;}
-.dt-h i{width:14px;height:14px;border-radius:4px;background:var(--c);}
-.sts-b{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;}
-.st-b{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 10px;border-radius:9px;border:2px solid var(--c);background:rgba(0,0,0,.18);font-weight:800;font-size:14px;min-height:46px;text-align:left;}
+.dt-h i{width:12px;height:12px;border-radius:4px;background:var(--c);}
+.sts-b{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px;}
+.st-b{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 11px;border-radius:10px;border:2px solid color-mix(in srgb,var(--c) 70%,transparent);background:rgba(0,0,0,.2);
+  font-weight:800;font-size:14px;height:50px;text-align:left;transition:background .12s,transform .08s;}
+.st-b:hover{background:color-mix(in srgb,var(--c) 14%,transparent);}
+.st-b:active{transform:scale(.96);}
 .st-b .l{color:var(--c);font-weight:900;}
-.st-b .v{font-size:17px;font-weight:900;}
-.st-b .v.e{color:var(--dim);font-size:13px;}
+.st-b .v{font-size:18px;font-weight:900;}
+.st-b .v.e{color:var(--dim);font-size:12.5px;font-weight:700;}
 .st-b.pend{border-style:dashed;}
-.st-b.brk{opacity:.45;border-style:dotted;}
-.st-b.ready{box-shadow:0 0 0 2px rgba(255,255,255,.25);}
-.desk-b{display:flex;flex-direction:column;gap:8px;border:2px solid var(--marigold);}
-.desk-b .row{display:flex;align-items:center;gap:8px;}
+.st-b.brk{opacity:.4;border-style:dotted;}
+.st-b.ready:not(.brk){border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent);}
+.desk-b{border:2px solid rgba(255,182,39,.6);}
+.desk-b .row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .dchips{display:flex;flex-wrap:wrap;gap:6px;}
-.dchips button{padding:6px 10px;border-radius:8px;background:rgba(255,182,39,.16);font-weight:900;}
-.dchips button.pend{outline:2px dashed var(--cream);outline-offset:-3px;}
-.dchips button.sel{box-shadow:0 0 0 3px var(--magenta);}
+.dchips button{position:relative;padding:7px 11px;border-radius:8px;background:rgba(255,182,39,.16);font-weight:900;}
+.dchips button.pend::before{content:'';position:absolute;inset:2px;border-radius:6px;border:2px dashed var(--text);opacity:.6;}
+.dchips button.sel{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text);}
 
 .draft{display:grid;gap:6px;}
-.di{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:var(--bg2);font-size:14px;font-weight:700;}
-.di .k{flex:0 0 auto;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:6px;}
-.di .k.add{background:rgba(22,193,114,.18);color:#7BE7B0;}
-.di .k.mov{background:rgba(255,182,39,.16);color:var(--marigold);}
+.di{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 10px;border-radius:10px;background:rgba(20,4,28,.55);border:1px solid var(--border);font-size:14px;font-weight:700;}
+.di .k{flex:0 0 auto;font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:6px;min-width:46px;text-align:center;}
+.di .k.add{background:rgba(24,199,122,.16);color:#7BE7B0;}
+.di .k.mov{background:rgba(255,182,39,.16);color:var(--gold);}
 .di .k.rem{background:rgba(242,95,92,.16);color:#FFB3B1;}
 .di .k.set{background:rgba(155,93,229,.2);color:#D7B8FF;}
 .di .t{flex:1;min-width:0;}
-.di .x{width:32px;height:32px;border-radius:8px;color:var(--muted);font-size:16px;flex:0 0 auto;}
-.di .x:hover{background:rgba(255,255,255,.06);}
-.empty-note{color:var(--dim);font-size:13.5px;font-weight:600;padding:6px 2px;}
+.di .x{width:32px;height:32px;border-radius:8px;color:var(--muted);font-size:15px;flex:0 0 auto;}
+.di .x:hover{background:rgba(255,255,255,.07);color:var(--text);}
+.empty-note{color:var(--dim);font-size:13.5px;font-weight:600;padding:4px 2px;line-height:1.5;}
 
 .dbar{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:12px 16px calc(12px + env(safe-area-inset-bottom));
-  background:rgba(22,5,31,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line2);}
-.dbar .in{max-width:1280px;margin:0 auto;display:flex;gap:10px;align-items:center;}
-.dbar .stat{font-size:12.5px;font-weight:700;color:var(--muted);line-height:1.35;min-width:0;}
-.go{flex:1;max-width:520px;margin-left:auto;height:58px;border-radius:14px;background:var(--go);color:#03240F;font-size:18px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;
-  box-shadow:0 8px 24px rgba(22,193,114,.35);transition:transform .08s,opacity .2s;}
-.go:active{transform:scale(.98);}
-.go:disabled{background:var(--panel2);color:var(--dim);box-shadow:none;}
-.undo{height:58px;padding:0 14px;border-radius:14px;border:1px solid var(--line2);font-weight:800;font-size:14px;color:var(--muted);white-space:nowrap;}
-@media (max-width:560px){ .dbar .stat{display:none;} .undo{padding:0 14px;} .undo .long{display:none;} .go{font-size:16px;letter-spacing:.03em;} }
+  background:rgba(20,4,28,.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--border);}
+.dbar .in{max-width:1320px;margin:0 auto;display:flex;gap:10px;align-items:center;}
+.dbar .stat{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--muted);line-height:1.35;min-width:0;}
+.dbar .stat b{display:block;color:var(--text);font-size:14px;}
+.go{flex:1;max-width:540px;margin-left:auto;height:60px;border-radius:16px;background:linear-gradient(180deg,#22D884,var(--ok));color:var(--ok-ink);
+  font-size:18px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:0 10px 26px rgba(24,199,122,.35),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .08s,opacity .2s;}
+.go:active:not(:disabled){transform:scale(.98);}
+.go:disabled{background:var(--surface-3);color:var(--dim);box-shadow:none;}
+.go .cnt{display:inline-grid;place-items:center;min-width:28px;height:28px;padding:0 8px;border-radius:999px;background:rgba(3,36,15,.85);color:#7BE7B0;font-size:14px;letter-spacing:0;}
+.undo{height:60px;padding:0 16px;border-radius:16px;border:1px solid var(--border-2);font-weight:800;font-size:14px;color:var(--muted);white-space:nowrap;}
+.undo:disabled{opacity:.4;}
 @media (max-width:640px){
-  .c-top{flex-wrap:wrap;row-gap:6px;}
-  .c-top h1{display:none;}
-  .c-top .conn{order:5;width:100%;}
-  .tabs{margin-right:auto;}
+  .dbar .stat{display:none;} .undo{padding:0 14px;} .undo .long{display:none;} .go{font-size:16px;letter-spacing:.04em;}
+  .c-top .in{flex-wrap:wrap;row-gap:8px;}
+  .brand{flex-basis:100%;}
+  .pill{order:5;flex-basis:100%;justify-content:center;}
+  .tabs{flex:1;} .tabs button{flex:1;}
+  .legend{display:none;}
 }
 
 /* setup */
-.c-body.setup{grid-template-columns:1fr;}
 @media (min-width:1100px){ .c-body.setup{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;} }
 .field{display:grid;gap:6px;margin-bottom:12px;}
-.field label{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
-.field input{background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:15px;font-weight:700;outline:none;width:100%;}
-.field input:focus{border-color:var(--marigold);}
+.field label{font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;}
+.field input{background:var(--bg);border:1px solid var(--border-2);border-radius:10px;padding:11px 12px;font-size:15px;font-weight:700;outline:none;width:100%;}
+.field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,182,39,.15);}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.tbl{border:1px solid var(--line2);border-left:5px solid var(--c);border-radius:12px;padding:12px;background:var(--bg2);display:grid;gap:10px;}
+.tlist{display:grid;gap:10px;}
+.tbl{border:1px solid var(--border);border-left:5px solid var(--c);border-radius:var(--r);padding:12px;background:rgba(20,4,28,.55);display:grid;gap:12px;}
 .tbl-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .tbl-h b{font-size:15px;}
-.tbl-h input{width:64px;background:var(--bg);border:1px solid var(--line2);border-radius:8px;padding:6px 8px;font-weight:800;font-size:15px;}
+.tbl-h input{width:66px;background:var(--bg);border:1px solid var(--border-2);border-radius:8px;padding:6px 8px;font-weight:800;font-size:15px;}
 .tbl-h .sp{flex:1;}
-.sw{display:flex;flex-wrap:wrap;gap:6px;}
-.sw button{width:26px;height:26px;border-radius:7px;background:var(--c);}
-.sw button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--cream);}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--border-2);border-radius:9px;overflow:hidden;}
+.stepper button{width:34px;height:32px;font-size:17px;font-weight:800;}
+.stepper button:hover:not(:disabled){background:var(--surface-3);}
+.stepper button:disabled{opacity:.3;}
+.stepper span{padding:0 8px;font-size:12.5px;font-weight:800;color:var(--muted);white-space:nowrap;}
+.sw{display:flex;flex-wrap:wrap;gap:7px;}
+.sw button{width:26px;height:26px;border-radius:50%;background:var(--c);}
+.sw button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text);}
 .stl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
-.stl .s{padding:7px 10px;border-radius:8px;border:2px solid var(--c);font-weight:900;font-size:13px;min-width:62px;}
+.stl .s{padding:6px 10px;border-radius:9px;border:2px solid color-mix(in srgb,var(--c) 70%,transparent);font-weight:900;font-size:13px;min-width:70px;text-align:left;}
 .stl .s.brk{opacity:.5;border-style:dotted;}
-.stl .s small{display:block;font-size:10px;font-weight:700;color:var(--muted);}
-.tlist{display:grid;gap:10px;margin-bottom:12px;}
+.stl .s small{display:block;font-size:10.5px;font-weight:700;color:var(--muted);}
 .mapwrap{overflow:auto;padding-bottom:4px;}
 .map-ed{position:relative;display:grid;gap:6px;min-width:420px;user-select:none;-webkit-user-select:none;}
 .cell{border:1px dashed rgba(255,255,255,.10);border-radius:10px;aspect-ratio:1.35;}
-.cell.hot{border-color:var(--marigold);background:rgba(255,182,39,.10);}
+.cell.hot{border-color:var(--gold);background:rgba(255,182,39,.10);}
 .piece{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;background:var(--c);color:var(--ink);
   font-weight:900;font-size:13px;touch-action:none;cursor:grab;box-shadow:0 4px 14px rgba(0,0,0,.35);text-align:center;line-height:1.15;padding:4px;}
 .piece small{font-size:10.5px;font-weight:800;opacity:.75;}
 .piece.drag{cursor:grabbing;opacity:.92;z-index:5;box-shadow:0 12px 30px rgba(0,0,0,.5);transform:scale(1.04);}
-.piece.desk{--c:var(--marigold);--ink:#2A0A12;outline:2px dashed rgba(42,10,18,.4);outline-offset:-5px;}
-.danger-zone{display:flex;flex-wrap:wrap;gap:10px;}
+.piece.desk{--c:var(--gold);--ink:#2A0A12;outline:2px dashed rgba(42,10,18,.4);outline-offset:-5px;}
+.btnrow{display:flex;flex-wrap:wrap;gap:10px;}
+.netlist{display:grid;gap:8px;}
+.netlist div{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:700;color:var(--muted);}
 
 /* dialogs + toast */
-dialog{margin:auto;border:1px solid var(--line);border-radius:16px;background:var(--bg2);color:var(--cream);padding:22px;max-width:min(420px,calc(100% - 32px));}
+dialog{margin:auto;border:1px solid var(--border-gold);border-radius:18px;background:var(--surface-2);color:var(--text);padding:22px;max-width:min(420px,calc(100% - 32px));box-shadow:0 30px 80px rgba(0,0,0,.6);}
 dialog::backdrop{background:rgba(10,2,14,.7);backdrop-filter:blur(3px);}
 dialog h3{font-size:18px;margin-bottom:8px;}
 dialog p{color:var(--muted);font-size:14.5px;line-height:1.55;font-weight:500;margin-bottom:18px;}
 dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
-.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);opacity:0;z-index:60;
-  background:var(--cream);color:#2A0A12;padding:11px 16px;border-radius:12px;font-weight:800;font-size:14px;transition:all .25s;pointer-events:none;max-width:calc(100% - 32px);text-align:center;}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);opacity:0;z-index:60;
+  background:var(--text);color:#2A0A12;padding:11px 16px;border-radius:12px;font-weight:800;font-size:14px;transition:all .25s;pointer-events:none;max-width:calc(100% - 32px);text-align:center;box-shadow:var(--shadow);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
 @media (prefers-reduced-motion:reduce){ *{animation:none !important;transition:none !important;} }
@@ -262,22 +322,24 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
 <!-- ═════════════ PIN GATE ═════════════ -->
 <section id="gate" hidden>
   <div class="gate-card">
-    <h1 class="title-font" id="gTitle"></h1>
-    <p>Enter your PIN</p>
+    <svg class="mandala" id="gMandala" viewBox="-50 -50 100 100" aria-hidden="true"></svg>
+    <h1 class="serif" id="gTitle"></h1>
+    <div class="divider" aria-hidden="true"><i></i></div>
+    <div class="lede">Enter PIN</div>
     <div class="dots" id="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <div class="pad" id="pad" role="group" aria-label="PIN keypad"></div>
     <div class="gate-err" id="gErr" role="alert"></div>
-    <div class="gate-hint">This device will remember you until you lock it.</div>
+    <div class="gate-hint">This device stays unlocked until you press Lock.</div>
   </div>
 </section>
 
 <!-- ═════════════ SCREEN ═════════════ -->
 <section id="screen" hidden>
   <div class="toran" id="toran" aria-hidden="true"></div>
-  <header class="s-head"><h1 class="title-font" id="sTitle"></h1></header>
+  <header class="s-head"><h1 class="serif" id="sTitle"></h1><div class="divider" aria-hidden="true"><i></i></div></header>
   <div class="s-strip"><div class="lbl">Just<br>called</div><div class="items" id="sStrip"></div></div>
   <div class="s-map" id="sMap" aria-live="polite"></div>
-  <span class="cdot warn" id="sDot" title="Connecting…"></span>
+  <div class="s-net quiet" id="sNet"><span class="dot warn" id="sDot"></span><span id="sNetT">Connecting…</span></div>
   <div class="s-tools">
     <button id="sFull">⛶ Full screen</button>
     <button id="sLock">Lock</button>
@@ -286,42 +348,46 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
 
 <!-- ═════════════ CONTROL ═════════════ -->
 <section id="control" hidden>
-  <div class="c-top">
-    <h1 class="title-font" id="cTitle"></h1>
-    <div class="conn"><span class="cdot warn" id="cDot"></span><span id="cConn">Connecting…</span></div>
+  <header class="c-top"><div class="in">
+    <div class="brand">
+      <svg viewBox="0 0 60 80" aria-hidden="true"><g stroke-linecap="round"><line x1="10" y1="74" x2="44" y2="8" stroke="#FFB627" stroke-width="7"/><line x1="50" y1="74" x2="16" y2="8" stroke="#E5257D" stroke-width="7"/><circle cx="44" cy="8" r="6" fill="#12B886"/><circle cx="16" cy="8" r="6" fill="#FF7A1A"/></g></svg>
+      <div style="min-width:0"><h1 class="serif" id="cTitle"></h1><small>Token desk</small></div>
+    </div>
+    <div class="pill" id="cPill" role="status"><span class="dot warn" id="cDot"></span><span id="cConn">Connecting…</span></div>
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected="true" data-tab="call">Call</button>
       <button role="tab" aria-selected="false" data-tab="setup">Setup</button>
     </div>
-    <button class="iconbtn" id="cLock" title="Lock this device">Lock</button>
-  </div>
-  <div id="cBanner"></div>
+    <button class="ghostbtn" id="cLock" title="Lock this device">Lock</button>
+  </div></header>
+  <div class="banner" id="cBanner"></div>
 
   <!-- CALL -->
   <div class="c-body call" id="tabCall">
-    <div class="col-l">
+    <div class="col">
       <div class="panel">
-        <h2><span class="n">1</span> Tap tokens <span class="sp"></span><button class="btn sm" id="selClear">Clear selection</button></h2>
+        <div class="ph"><span class="n">1</span><h2>Pick tokens</h2><span class="sp"></span><button class="btn sm" id="selClear">Clear selection</button></div>
         <div class="search">
-          <input id="q" inputmode="numeric" autocomplete="off" placeholder="Type e.g. 46  or  41,42  or  41-45" aria-label="Find tokens">
+          <input id="q" inputmode="numeric" autocomplete="off" placeholder="e.g. 46 or 41-45" aria-label="Find tokens">
           <button class="btn pri" id="qGo">Select</button>
         </div>
-        <div class="legend">
-          <span><i style="background:var(--bg2);border:1px solid var(--line2)"></i>Free</span>
-          <span><i style="background:var(--magenta)"></i>Placed (table colour)</span>
-          <span><i style="outline:2px dashed var(--cream);outline-offset:-3px"></i>Not on screen yet</span>
+        <div class="filters" role="group" aria-label="Show">
+          <button class="chipf" data-f="all" aria-pressed="true">All<span class="c" id="fcAll"></span></button>
+          <button class="chipf" data-f="free" aria-pressed="false">Free<span class="c" id="fcFree"></span></button>
+          <button class="chipf" data-f="on" aria-pressed="false">On board<span class="c" id="fcOn"></span></button>
+          <div class="legend"><span><i style="background:var(--magenta)"></i>Placed</span><span><i style="border:2px dashed var(--muted)"></i>Not on screen yet</span></div>
         </div>
         <div class="tgrid" id="tgrid" role="group" aria-label="Tokens"></div>
         <div class="selbar" id="selbar"></div>
       </div>
     </div>
-    <div class="col-r">
+    <div class="col col-r">
       <div class="panel">
-        <h2><span class="n">2</span> Send to</h2>
+        <div class="ph"><span class="n">2</span><h2>Send to</h2></div>
         <div class="dest" id="dest"></div>
       </div>
       <div class="panel">
-        <h2><span class="n">3</span> Draft — not on screen yet <span class="sp"></span><button class="btn sm" id="discard">Discard all</button></h2>
+        <div class="ph"><span class="n">3</span><h2>Draft</h2><span class="sp"></span><button class="btn sm" id="discard">Discard all</button></div>
         <div class="draft" id="draft"></div>
       </div>
     </div>
@@ -329,22 +395,22 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
 
   <!-- SETUP -->
   <div class="c-body setup" id="tabSetup" hidden>
-    <div class="col-l">
+    <div class="col">
       <div class="panel">
-        <h2>Event</h2>
+        <div class="ph"><h2>Event</h2></div>
         <div class="field"><label for="fTitle">Heading on screen</label><input id="fTitle" maxlength="70"></div>
-        <div class="field"><label for="fTotal">Tokens issued (1 to …)</label><input id="fTotal" type="number" inputmode="numeric" min="1" max="2000"></div>
+        <div class="field" style="margin:0"><label for="fTotal">Tokens issued (1 to …)</label><input id="fTotal" type="number" inputmode="numeric" min="1" max="2000"></div>
       </div>
       <div class="panel">
-        <h2>Tables &amp; stations <span class="sp"></span><button class="btn sm pri" id="addTable">+ Add table</button></h2>
+        <div class="ph"><h2>Tables &amp; stations</h2><span class="sp"></span><button class="btn sm pri" id="addTable">+ Add table</button></div>
         <p class="hint" style="margin-bottom:12px">Tap a station to put it on a break, or back on. Stations are lettered A, B, C… — removing one takes away the last letter.</p>
         <div class="tlist" id="tlist"></div>
       </div>
     </div>
-    <div class="col-r">
+    <div class="col">
       <div class="panel">
-        <h2>Floor plan</h2>
-        <p class="hint" style="margin-bottom:12px">Drag tables and the Front Desk to where they sit in the hall. Drop on another piece to swap them.</p>
+        <div class="ph"><h2>Floor plan</h2></div>
+        <p class="hint" style="margin-bottom:12px">Drag tables and the Front Desk to where they sit in the hall. Drop on another piece to swap. Empty rows and columns are left out on the TV.</p>
         <div class="row2" style="margin-bottom:12px">
           <div class="field" style="margin:0"><label for="fCols">Columns</label><input id="fCols" type="number" min="1" max="14" inputmode="numeric"></div>
           <div class="field" style="margin:0"><label for="fRows">Rows</label><input id="fRows" type="number" min="1" max="10" inputmode="numeric"></div>
@@ -352,18 +418,22 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
         <div class="mapwrap"><div class="map-ed" id="mapEd"></div></div>
       </div>
       <div class="panel">
-        <h2>Layout file</h2>
-        <p class="hint" style="margin-bottom:12px">Save the tables, stations and map to a file, and load it on any device. Tokens are not included.</p>
-        <div class="danger-zone">
+        <div class="ph"><h2>Connection</h2></div>
+        <div class="netlist" id="netlist"></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><h2>Layout file</h2></div>
+        <p class="hint" style="margin-bottom:12px">Save the tables, stations and map to a file and load it on any device. Tokens are not included.</p>
+        <div class="btnrow">
           <button class="btn" id="exp">⬇ Export layout</button>
           <button class="btn" id="imp">⬆ Import layout</button>
           <input type="file" id="impFile" accept=".json,application/json" hidden>
         </div>
       </div>
       <div class="panel">
-        <h2>Reset</h2>
+        <div class="ph"><h2>Reset</h2></div>
         <p class="hint" style="margin-bottom:12px">Both go into the draft — the screen only changes when you press Display.</p>
-        <div class="danger-zone">
+        <div class="btnrow">
           <button class="btn danger" id="clrTokens">Clear tokens</button>
           <button class="btn danger" id="clrAll">Reset everything</button>
         </div>
@@ -371,13 +441,11 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
     </div>
   </div>
 
-  <div class="dbar">
-    <div class="in">
-      <div class="stat" id="dStat"></div>
-      <button class="undo" id="undoBtn" disabled>↶ Undo<span class="long"> last Display</span></button>
-      <button class="go" id="goBtn" disabled>Display</button>
-    </div>
-  </div>
+  <div class="dbar"><div class="in">
+    <div class="stat"><span class="dot warn" id="dDot"></span><span id="dStat"></span></div>
+    <button class="undo" id="undoBtn" disabled>↶ Undo<span class="long"> last Display</span></button>
+    <button class="go" id="goBtn" disabled>Display</button>
+  </div></div>
 </section>
 
 <dialog id="dlg">
@@ -390,15 +458,22 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    SETTINGS — change these if you reuse the file for another event.
-   PEER_ID must be unique to your event: it is how the controller finds
-   the screen on the public PeerJS broker.
+   EVENT_ID must be unique to your event: it names the private channel
+   the screen and controller share on the relay servers.
    ═══════════════════════════════════════════════════════════════════ */
 const CONFIG = {
   SCREEN_PIN:  '7868',
   CONTROL_PIN: '6879',
   TITLE:       'Salgirah Celebration Night Mehndi',
-  PEER_ID:     'salgirah-mehndi-tokens-q7x3k9',
-  TOKENS:      300
+  EVENT_ID:    'salgirah-mehndi-q7x3k9-2026',
+  TOKENS:      300,
+  // Free public MQTT relays (secure WebSockets). All are used at once;
+  // any one working is enough. The :443 one gets through strict Wi-Fi.
+  RELAYS: [
+    'wss://broker.emqx.io:8084/mqtt',
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://mqtt.eclipseprojects.io:443/mqtt'
+  ]
 };
 
 (function(){
@@ -406,28 +481,26 @@ const CONFIG = {
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clone = o => JSON.parse(JSON.stringify(o));
-const uid = p => p + Math.random().toString(36).slice(2, 8);
+const uid = p => p + Math.random().toString(36).slice(2, 10);
 const LS = {
   get(k, d){ try{ const v = localStorage.getItem('mehndi_' + k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem('mehndi_' + k, JSON.stringify(v)); }catch(e){} },
   del(k){ try{ localStorage.removeItem('mehndi_' + k); }catch(e){} }
 };
 
-/* Festive preset palette — ink is the readable text colour on top. */
 const PALETTE = [
   {c:'#E5257D', ink:'#fff'},    {c:'#12B886', ink:'#04241A'}, {c:'#FFB627', ink:'#2A0A12'},
   {c:'#3D7BFF', ink:'#fff'},    {c:'#FF7A1A', ink:'#2A0A12'}, {c:'#9B5DE5', ink:'#fff'},
   {c:'#00B4D8', ink:'#03222A'}, {c:'#E63946', ink:'#fff'},    {c:'#8AC926', ink:'#132A04'},
   {c:'#F4A3A8', ink:'#2A0A12'}
 ];
-const inkOf = c => (PALETTE.find(p => p.c === c) || {ink:'#fff'}).ink;
+const inkOf = c => (PALETTE.find(p => p.c === c) || {ink:'#2A0A12'}).ink;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 /* ─── Board model ──────────────────────────────────────────────────
    { rev, title, total, cols, rows,
      tables:[{id, num, color, x, y, stations:[{id, brk}]}],
-     desk:{x, y},
-     assign:{stationId: token}, deskTokens:[token],
+     desk:{x, y}, assign:{stationId: token}, deskTokens:[token],
      recent:[{t, label, color}], changed:[keys], at } */
 function emptyBoard(){
   return { rev:0, title:CONFIG.TITLE, total:CONFIG.TOKENS, cols:6, rows:4,
@@ -439,7 +512,7 @@ function normBoard(b){
   const int = (v, def, lo, hi) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def; };
   const out = {
     rev: int(b.rev, 0, 0, Number.MAX_SAFE_INTEGER),
-    title: typeof b.title === 'string' ? b.title.slice(0, 70) : d.title,
+    title: typeof b.title === 'string' && b.title.trim() ? b.title.slice(0, 70) : d.title,
     total: int(b.total, d.total, 1, 2000),
     cols: int(b.cols, d.cols, 1, 14), rows: int(b.rows, d.rows, 1, 10),
     tables: (Array.isArray(b.tables) ? b.tables : []).slice(0, 60).map(t => ({
@@ -461,7 +534,7 @@ function normBoard(b){
     const t = int(v, null, 1, 99999); if(t != null && !used.has(t)){ out.deskTokens.push(t); used.add(t); }
   });
   out.recent = (Array.isArray(b.recent) ? b.recent : []).slice(0, 8).map(r => ({
-    t: int(r.t, 0, 0, 99999), label: String(r.label || '').slice(0, 20), color: String(r.color || '#FFB627').slice(0, 9)
+    t: int(r.t, 0, 0, 99999), label: String(r.label || '').slice(0, 20), color: /^#[0-9a-f]{6}$/i.test(r.color) ? r.color : '#FFB627'
   }));
   out.changed = (Array.isArray(b.changed) ? b.changed : []).slice(0, 200).map(String);
   return out;
@@ -481,154 +554,103 @@ function placeText(b, p){ return !p ? '—' : p.kind === 'd' ? 'Front Desk' : 'T
 function placeColor(b, p){ if(!p) return null; if(p.kind === 'd') return '#FFB627'; const t = tableOfStation(b, p.id); return t ? t.color : null; }
 const nextRev = prev => Math.max(Date.now(), (prev || 0) + 1);
 
-/* ═════════════ TRANSPORT ═════════════
-   The Screen is the hub. Messages: hello, welcome, publish, ack, state,
-   ping, denied, superseded. They travel over PeerJS data connections and,
-   for tabs in the same browser, over a BroadcastChannel. */
-const ME = uid('n');
-let bc = null;
-try{ bc = new BroadcastChannel('mehndi-tokens-' + CONFIG.PEER_ID); }catch(e){}
+/* ═════════════ RELAY ═════════════
+   Topics under mehndi-tokens/<EVENT_ID>/
+     board          retained — the full board the screen should show
+     control        retained — {id, at}: which controller is in charge
+     screen/<id>    heartbeat from each screen every 4 s: {id, rev, at}
+   The same messages also travel over a BroadcastChannel, so tabs in one
+   browser stay in sync even with no internet. */
+const ME = uid('d');
+const BASE = 'mehndi-tokens/' + CONFIG.EVENT_ID.replace(/[^a-z0-9_-]/gi, '') + '/';
+const T = { board: BASE + 'board', control: BASE + 'control', screen: BASE + 'screen/' };
+const RELAY_OVERRIDE = new URLSearchParams(location.search).get('relay');   // testing aid
+const RELAYS = RELAY_OVERRIDE ? RELAY_OVERRIDE.split(',') : CONFIG.RELAYS;
 
-function makeHub(handlers){
-  // handlers: onHello(msg, reply), onPublish(msg, reply), onStatus(str)
-  const conns = new Map();      // peerId → conn
-  let peer = null, viewerConn = null, isHost = false, dead = false, tries = 0;
-  const replyLocal = to => m => bc && bc.postMessage(Object.assign({to}, m));
-  if(bc) bc.addEventListener('message', e => {
-    const m = e.data || {};
-    if(m.to && m.to !== ME) return;
-    if(m.t === 'hello') handlers.onHello(m, replyLocal(m.from), m.from);
-    else if(m.t === 'publish') handlers.onPublish(m, replyLocal(m.from), m.from);
-  });
-  function broadcast(m){
-    if(bc) bc.postMessage(m);
-    conns.forEach(c => { try{ c.open && c.send(m); }catch(e){} });
-  }
-  function status(){
-    handlers.onStatus(isHost ? (peer && !peer.disconnected ? 'live' : 'local') : viewerConn ? 'viewer' : (window.Peer ? 'connecting' : 'local'));
-  }
-  function startHost(){
-    if(dead) return;
-    if(!window.Peer){ status(); return; }
-    try{ peer && peer.destroy(); }catch(e){}
-    peer = new Peer(CONFIG.PEER_ID, { debug: 0 });
-    peer.on('open', () => { isHost = true; tries = 0; status(); });
-    peer.on('connection', conn => {
-      conn.on('open', () => conns.set(conn.peer, conn));
-      conn.on('data', m => {
-        if(!m || typeof m !== 'object') return;
-        const reply = x => { try{ conn.send(x); }catch(e){} };
-        if(m.t === 'hello') handlers.onHello(m, reply, m.from || conn.peer);
-        else if(m.t === 'publish') handlers.onPublish(m, reply, m.from || conn.peer);
+function makeRelay(opts){
+  // opts: { subs:[topics], onMessage(topic, msg, via), onConnect(link), onStatus() }
+  const links = [];
+  let bc = null;
+  try{
+    bc = new BroadcastChannel('mehndi-' + CONFIG.EVENT_ID);
+    bc.onmessage = e => { const d = e.data || {}; if(d.topic) opts.onMessage(d.topic, d.msg, 'local'); };
+  }catch(e){}
+  if(window.mqtt){
+    RELAYS.forEach((url, i) => {
+      const link = { url, name: url.replace(/^wss?:\/\//, '').replace(/[:/].*$/, ''), up: false, client: null, seenRev: 0 };
+      links.push(link);
+      try{
+        link.client = mqtt.connect(url, {
+          clientId: 'mt_' + ME + '_' + i, clean: true, keepalive: 25,
+          reconnectPeriod: 3000, connectTimeout: 12000, resubscribe: false, queueQoSZero: false
+        });
+      }catch(e){ return; }
+      link.client.on('connect', () => {
+        link.up = true; link.seenRev = 0;
+        link.client.subscribe(opts.subs, { qos: 1 });
+        opts.onStatus(); if(opts.onConnect) opts.onConnect(link);
       });
-      conn.on('close', () => conns.delete(conn.peer));
-      conn.on('error', () => conns.delete(conn.peer));
-    });
-    peer.on('disconnected', () => { status(); setTimeout(() => { try{ if(!dead && peer && !peer.destroyed) peer.reconnect(); }catch(e){} }, 2000); });
-    peer.on('error', err => {
-      isHost = false; status();
-      // Another screen already holds the hub id (or the broker still remembers
-      // this screen from before a reload): follow it as a viewer, and retry.
-      if(err && err.type === 'unavailable-id') becomeViewer();
-      else setTimeout(startHost, Math.min(15000, 2000 * ++tries));
+      link.client.on('message', (topic, payload) => {
+        let msg; try{ msg = JSON.parse(payload.toString()); }catch(e){ return; }
+        opts.onMessage(topic, msg, link);
+      });
+      ['close', 'offline', 'end'].forEach(ev => link.client.on(ev, () => { if(link.up){ link.up = false; opts.onStatus(); } }));
+      link.client.on('error', () => {});
     });
   }
-  function becomeViewer(){
-    try{ peer && peer.destroy(); }catch(e){}
-    peer = new Peer(undefined, { debug: 0 });
-    let got = false;
-    peer.on('open', () => {
-      const c = peer.connect(CONFIG.PEER_ID, { serialization: 'json', reliable: true });
-      c.on('open', () => { c.send({t:'hello', role:'viewer', pin:CONFIG.SCREEN_PIN, from:ME}); });
-      c.on('data', m => { got = true; viewerConn = c; status(); handlers.onViewerMsg && handlers.onViewerMsg(m); });
-      c.on('close', () => { viewerConn = null; setTimeout(startHost, 1500); });
-    });
-    peer.on('error', () => {});
-    // No hub answered: the id was stale — try to be the hub again.
-    setTimeout(() => { if(!got){ viewerConn = null; startHost(); } }, 8000);
-  }
-  startHost();
-  status();
-  return { broadcast, conns, isHost: () => isHost };
-}
-
-function makeClient(handlers){
-  // handlers: onMsg(m), onLink(bool)
-  let peer = null, conn = null, last = 0, dead = false, connecting = false;
-  function got(m){ if(!m || typeof m !== 'object') return; if(m.to && m.to !== ME) return; last = Date.now(); handlers.onMsg(m); }
-  if(bc) bc.addEventListener('message', e => {
-    const m = e.data || {};
-    if(['welcome','ack','state','ping','denied','superseded'].includes(m.t)) got(m);
-  });
-  function send(m){
-    m.from = ME;
-    if(bc) bc.postMessage(m);
-    if(conn && conn.open){ try{ conn.send(m); }catch(e){} }
-  }
-  function open(){
-    if(dead || connecting || !window.Peer) return;
-    connecting = true;
-    const go = () => {
-      try{ conn && conn.close(); }catch(e){}
-      conn = peer.connect(CONFIG.PEER_ID, { serialization: 'json', reliable: true });
-      conn.on('open', () => { connecting = false; handlers.onOpen(); });
-      conn.on('data', got);
-      conn.on('close', () => { connecting = false; conn = null; });
-      conn.on('error', () => { connecting = false; conn = null; });
-      setTimeout(() => { connecting = false; }, 7000);
-    };
-    if(peer && !peer.destroyed && peer.open) return go();
-    try{ peer && peer.destroy(); }catch(e){}
-    peer = new Peer(undefined, { debug: 0 });
-    peer.on('open', go);
-    peer.on('error', () => { connecting = false; });
-    peer.on('disconnected', () => { try{ peer.reconnect(); }catch(e){} });
-  }
-  // Watchdog: the screen pings every 4 s; quiet for 10 s means reconnect.
-  let wasLive = false;
-  setInterval(() => {
-    const live = Date.now() - last < 10000;
-    if(live && !wasLive) handlers.onOpen();   // (re)introduce ourselves whenever the screen reappears
-    wasLive = live;
-    handlers.onLink(live);
-    if(!live){ if(!conn || !conn.open) open(); handlers.onOpen(); }
-  }, 3000);
-  open();
-  setTimeout(() => handlers.onOpen(), 0);
-  return { send, live: () => Date.now() - last < 10000 };
+  return {
+    links,
+    up: () => links.filter(l => l.up).length,
+    hasLocal: !!bc,
+    publish(topic, msg, o, onlyLink){
+      const s = JSON.stringify(msg);
+      (onlyLink ? [onlyLink] : links).forEach(l => { if(l.up){ try{ l.client.publish(topic, s, o || { qos: 0 }); }catch(e){} } });
+      if(bc && !onlyLink){ try{ bc.postMessage({ topic, msg }); }catch(e){} }
+    },
+    local(topic, msg){ if(bc){ try{ bc.postMessage({ topic, msg }); }catch(e){} } }
+  };
 }
 
 /* ═════════════ PIN GATE ═════════════ */
+function mandalaSvg(){
+  const g = [];
+  const ring = (r, n, rx, ry, col, op) => { for(let i = 0; i < n; i++) g.push(`<ellipse cx="0" cy="${-r}" rx="${rx}" ry="${ry}" fill="none" stroke="${col}" stroke-width="1.3" opacity="${op}" transform="rotate(${i * 360 / n})"/>`); };
+  g.push('<circle r="47" fill="none" stroke="#FFB627" stroke-width="1" opacity=".5" stroke-dasharray="2 3"/>');
+  ring(38, 16, 4, 8, '#FFB627', .8); ring(25, 12, 4, 7, '#E5257D', .8); ring(13, 8, 3, 5, '#12B886', .8);
+  g.push('<circle r="4" fill="#FFB627"/>');
+  return g.join('');
+}
 function showGate(){
   $('gate').hidden = false;
   $('gTitle').textContent = CONFIG.TITLE;
-  let pin = '';
+  $('gMandala').innerHTML = mandalaSvg();
+  let pin = '', busy = false;
   const dots = [...$('dots').children];
-  const keys = ['1','2','3','4','5','6','7','8','9','clear','0','⌫'];
-  $('pad').innerHTML = keys.map(k => k === 'clear'
+  $('pad').innerHTML = ['1','2','3','4','5','6','7','8','9','c','0','⌫'].map(k => k === 'c'
     ? '<button class="ghost" data-k="c">Clear</button>'
     : `<button data-k="${k}" aria-label="${k === '⌫' ? 'Delete' : k}">${k}</button>`).join('');
   const paint = () => dots.forEach((d, i) => d.classList.toggle('on', i < pin.length));
   function press(k){
+    if(busy) return;
     $('gErr').textContent = '';
     if(k === 'c') pin = '';
     else if(k === '⌫') pin = pin.slice(0, -1);
     else if(pin.length < 4) pin += k;
     paint();
-    if(pin.length === 4){
-      const role = pin === CONFIG.SCREEN_PIN ? 'screen' : pin === CONFIG.CONTROL_PIN ? 'control' : null;
-      if(!role){
-        $('dots').classList.remove('shake'); void $('dots').offsetWidth; $('dots').classList.add('shake');
-        $('gErr').textContent = 'That PIN is not right — try again.';
-        setTimeout(() => { pin = ''; paint(); }, 350);
-        return;
-      }
-      LS.set('role', role);
-      try{ sessionStorage.setItem('mehndi_role', role); }catch(e){}
-      $('gate').hidden = true;
-      if(role === 'screen'){ try{ document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){} }
-      start(role);
+    if(pin.length < 4) return;
+    const role = pin === CONFIG.SCREEN_PIN ? 'screen' : pin === CONFIG.CONTROL_PIN ? 'control' : null;
+    if(!role){
+      busy = true;
+      $('dots').classList.remove('shake'); void $('dots').offsetWidth; $('dots').classList.add('shake');
+      $('gErr').textContent = 'That PIN is not right — try again.';
+      setTimeout(() => { pin = ''; paint(); busy = false; }, 400);
+      return;
     }
+    LS.set('role', role);
+    try{ sessionStorage.setItem('mehndi_role', role); }catch(e){}
+    if(role === 'screen'){ try{ document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){} }
+    $('dots').classList.add('ok'); busy = true;
+    setTimeout(() => { $('gate').hidden = true; start(role); }, 180);
   }
   $('pad').addEventListener('click', e => { const b = e.target.closest('button'); if(b) press(b.dataset.k); });
   document.addEventListener('keydown', function onKey(e){
@@ -647,62 +669,56 @@ function startScreen(){
   $('screen').hidden = false;
   $('toran').innerHTML = '<i></i>'.repeat(30);
   let board = normBoard(LS.get('screen_board', null));
-  let activeControl = null;
+  let lostSince = Date.now();
 
   function apply(next, animate){
     next = normBoard(next);
     if(next.rev <= board.rev) return false;
     board = next;
     LS.set('screen_board', board);
-    render(animate && Date.now() - board.at < 60000);
+    render(animate && Date.now() - board.at < 90000);
+    beat();                                   // doubles as the acknowledgement
     return true;
   }
-
-  const hub = makeHub({
-    onHello(m, reply, who){
-      if(m.role === 'control'){
-        if(m.pin !== CONFIG.CONTROL_PIN) return reply({t:'denied'});
-        // One controller at a time: the newest one in takes over.
-        if(activeControl && activeControl.who !== who) activeControl.reply({t:'superseded', to: activeControl.who});
-        activeControl = {who, reply};
-      }else if(m.pin !== CONFIG.SCREEN_PIN) return reply({t:'denied'});
-      reply({t:'welcome', board});
-    },
-    onPublish(m, reply, who){
-      if(m.pin !== CONFIG.CONTROL_PIN) return reply({t:'denied'});
-      if(!activeControl) activeControl = {who, reply};   // screen restarted: first controller back is in charge
-      if(activeControl.who !== who) return reply({t:'superseded', to: who});
-      if(apply(m.board, true)) hub.broadcast({t:'state', board});
-      reply({t:'ack', rev: board.rev});
-    },
-    onViewerMsg(m){ if(m.board) apply(m.board, m.t === 'state'); },
-    onStatus(st){
-      const dot = $('sDot');
-      dot.className = 'cdot' + (st === 'live' || st === 'viewer' ? '' : st === 'connecting' ? ' warn' : ' bad');
-      dot.title = {live:'Ready — controller can connect', viewer:'Following the main screen', connecting:'Connecting…', local:'Offline — same-device only'}[st];
-    }
+  const relay = makeRelay({
+    subs: [T.board],
+    onMessage(topic, msg){ if(topic === T.board && msg && msg.board) apply(msg.board, true); },
+    onStatus: netStatus
   });
-  setInterval(() => hub.broadcast({t:'ping', rev: board.rev}), 4000);
+  relay.local('hello', { from: ME });         // a controller tab in this browser answers with the board
+  // A stable id per screen device, so a reload is not counted as a second screen.
+  const SID = LS.get('screen_id', null) || uid('s');
+  LS.set('screen_id', SID);
+  function beat(){ relay.publish(T.screen + SID, { id: SID, rev: board.rev, at: Date.now() }); }
+  setInterval(beat, 4000);
+  setInterval(netStatus, 2000);
+
+  function netStatus(){
+    const up = relay.up();
+    if(up) lostSince = 0; else if(!lostSince) lostSince = Date.now();
+    const long = !up && Date.now() - lostSince > 8000;
+    $('sDot').className = 'dot' + (up ? '' : long ? ' bad' : ' warn');
+    $('sNetT').textContent = window.mqtt ? 'Reconnecting… showing the last board' : 'Connection library did not load — reload the page';
+    $('sNet').classList.toggle('quiet', !long);
+  }
 
   let shownRecent = [];
   function render(animate){
     $('sTitle').textContent = board.title;
-    // Just called
     const keys = board.recent.map(r => r.t + '>' + r.label);
     $('sStrip').innerHTML = board.recent.length ? board.recent.map((r, i) =>
-      `<div class="jc${animate && !shownRecent.includes(keys[i]) ? ' new' : ''}">${r.t}<span class="ar">→</span><span class="to" style="background:${esc(r.color)}">${esc(r.label)}</span></div>`).join('')
+      `<div class="jc${animate && !shownRecent.includes(keys[i]) ? ' new' : ''}">${r.t}<span class="ar">→</span><span class="to" style="background:${esc(r.color)};--ink:${inkOf(r.color)}">${esc(r.label)}</span></div>`).join('')
       : '<div class="empty">Called tokens will appear here</div>';
     shownRecent = keys;
 
-    // Map — trimmed to the cells actually used so it fills the screen.
     const map = $('sMap');
-    const items = board.tables.map(t => ({x:t.x, y:t.y, t})).concat([{x:board.desk.x, y:board.desk.y, desk:true}]);
     if(!board.tables.length){
       map.style.gridTemplateColumns = map.style.gridTemplateRows = '';
-      map.innerHTML = '<div class="s-wait"><div class="big title-font">Welcome</div><div class="small">Mehndi tokens will be called on this screen</div></div>';
+      map.innerHTML = '<div class="s-wait"><div class="big serif">Welcome</div><div class="small">Mehndi tokens will be called on this screen</div></div>';
       return;
     }
-    // Empty rows/columns are dropped: same relative layout, much bigger tiles.
+    // Empty rows/columns are dropped: same relative layout, bigger tiles.
+    const items = board.tables.map(t => ({x:t.x, y:t.y, t})).concat([{x:board.desk.x, y:board.desk.y, desk:true}]);
     const xs = [...new Set(items.map(i => i.x))].sort((a, c) => a - c);
     const ys = [...new Set(items.map(i => i.y))].sort((a, c) => a - c);
     map.style.gridTemplateColumns = `repeat(${xs.length}, minmax(0,1fr))`;
@@ -713,7 +729,7 @@ function startScreen(){
       if(i.desk){
         const n = board.deskTokens.length;
         const dc = Math.max(1, Math.ceil(Math.sqrt(n * 1.4))), dr = Math.max(1, Math.ceil(n / dc));
-        const fs = `min(${Math.round(62 / dr)}cqh, ${Math.round(32 / dc)}cqw)`;
+        const fs = `min(${Math.round(60 / dr)}cqh, ${Math.round(30 / dc)}cqw)`;
         return `<div class="card desk" style="${pos}--dc:${dc};--dfs:${fs}"><div class="hd">Front Desk</div>` +
           (n ? `<div class="dks">${board.deskTokens.map(t => {
               const hot = changed.has('d:' + t);
@@ -726,13 +742,13 @@ function startScreen(){
           const tok = board.assign[s.id], hot = changed.has('s:' + s.id) && tok != null;
           return `<div class="st${s.brk ? ' brk' : ''}${hot ? ' glow' : ''}"><span class="lt">${LETTERS[k]}</span>` +
             (s.brk ? '<span class="tk">Break</span>'
-             : tok != null ? `<span class="tk${hot ? ' pop' : ''}">${tok}</span>` : '<span class="tk none">—</span>') + '</div>';
+             : tok != null ? `<span class="tk"><span class="${hot ? 'pop' : ''}">${tok}</span></span>` : '<span class="tk none">—</span>') + '</div>';
         }).join('') : '<div class="st"><span class="tk none">—</span></div>') + '</div></div>';
     }).join('');
   }
   render(false);
+  netStatus();
 
-  // Wake lock, idle cursor, tools
   let wake = null;
   const keepAwake = async () => { try{ if('wakeLock' in navigator && !document.hidden) wake = await navigator.wakeLock.request('screen'); }catch(e){} };
   keepAwake();
@@ -751,48 +767,66 @@ function startControl(){
 
   let pub   = normBoard(LS.get('ctl_pub', null));        // what the screen shows (or will, once reached)
   let draft = normBoard(LS.get('ctl_draft', null) || pub);
-  let history = LS.get('ctl_hist', []).map(normBoard);   // earlier pubs, newest last, for Undo
-  let ackRev = LS.get('ctl_ack', 0);
-  let sel = [];                                          // selected tokens, in tap order
-  let superseded = false, linkLive = false;
-  if(!pub.tables.length && !pub.rev && !draft.tables.length) seedLayout();
+  let history = LS.get('ctl_hist', []).map(normBoard);   // earlier boards, newest last, for Undo
+  let sel = [], filter = 'all';
+  let claimAt = Date.now(), superseded = false, lastPush = 0;
+  const screens = new Map();                             // screenId → {rev, at}
+  if(!pub.rev && !pub.tables.length && !draft.tables.length) seedLayout();
 
   function seedLayout(){
-    // A starting point: 6 tables × 3 stations around the hall, Front Desk by the door.
-    draft.tables = [];
     const spots = [[0,0],[2,0],[4,0],[0,2],[2,2],[4,2]];
-    spots.forEach((p, i) => draft.tables.push({ id: uid('t'), num: i + 1, color: PALETTE[i].c, x: p[0], y: p[1],
+    draft.tables = spots.map((p, i) => ({ id: uid('t'), num: i + 1, color: PALETTE[i].c, x: p[0], y: p[1],
       stations: [0,1,2].map(() => ({ id: uid('s'), brk: false })) }));
     draft.cols = 6; draft.rows = 4; draft.desk = {x:5, y:3};
   }
-  const save = () => { LS.set('ctl_pub', pub); LS.set('ctl_draft', draft); LS.set('ctl_hist', history.slice(-10)); LS.set('ctl_ack', ackRev); };
+  const save = () => { LS.set('ctl_pub', pub); LS.set('ctl_draft', draft); LS.set('ctl_hist', history.slice(-10)); };
 
-  /* ── sync ── */
-  const client = makeClient({
-    onOpen(){ if(!superseded) client.send({t:'hello', role:'control', pin:CONFIG.CONTROL_PIN}); },
-    onMsg(m){
-      if(m.t === 'denied'){ banner('bad', 'The screen refused this PIN. Check that both devices have the same file.'); return; }
-      if(m.t === 'superseded'){ superseded = true; renderStatus(); return; }
-      if(m.t === 'welcome' && m.board){
-        const hb = normBoard(m.board);
-        if(hb.rev < pub.rev){ sendPub(); }                    // screen lost its copy → restore it
-        else if(hb.rev > pub.rev){                           // screen is ahead (another device) → adopt
-          const clean = !diff(pub, draft).length;
-          pub = hb; if(clean) draft = clone(pub); ackRev = pub.rev; save(); renderAll();
-        }else{ ackRev = pub.rev; save(); renderStatus(); }
-      }
-      if(m.t === 'ack'){ ackRev = Math.max(ackRev, m.rev || 0); save(); renderStatus(); }
-      if(m.t === 'ping' && typeof m.rev === 'number' && m.rev < pub.rev && !superseded) sendPub();
+  /* ── connection ── */
+  const relay = makeRelay({
+    subs: [T.board, T.control, T.screen + '+'],
+    onConnect(link){
+      relay.publish(T.control, { id: ME, at: claimAt }, { qos: 1, retain: true }, link);
+      // Let the relay hand over its stored board first, then top it up
+      // if ours is newer (e.g. the relay restarted and forgot it).
+      setTimeout(() => { if(link.up && !superseded && pub.rev > link.seenRev) pushTo(link); }, 1800);
     },
-    onLink(live){ if(live !== linkLive){ linkLive = live; renderStatus(); } }
+    onMessage(topic, msg, via){
+      if(!msg || typeof msg !== 'object') return;
+      if(topic === T.board && msg.board){
+        const hb = normBoard(msg.board);
+        if(via !== 'local') via.seenRev = Math.max(via.seenRev, hb.rev);
+        if(hb.rev > pub.rev){                             // another device displayed something newer → adopt it
+          // A device that never displayed anything only has the starter
+          // layout in its draft — the live board replaces it.
+          const clean = !diff(pub, draft).length || !pub.rev;
+          pub = hb; if(clean) draft = clone(pub);
+          save(); renderAll();
+        }
+      }else if(topic === T.control){
+        if(msg.id && msg.id !== ME && msg.at > claimAt && !superseded){ superseded = true; renderStatus(); }
+      }else if(topic.indexOf(T.screen) === 0 && msg.id){
+        screens.set(msg.id, { rev: msg.rev || 0, at: Date.now(), local: via === 'local' });
+        renderStatus();
+      }else if(topic === 'hello' && pub.rev){             // a screen tab in this same browser
+        relay.local(T.board, { board: pub });
+      }
+    },
+    onStatus: () => renderStatus()
   });
-  let lastSend = 0;
-  function sendPub(){
-    if(superseded || Date.now() - lastSend < 1500) return;
-    lastSend = Date.now();
-    client.send({t:'publish', pin:CONFIG.CONTROL_PIN, board:pub});
+  function pushTo(link){ relay.publish(T.board, { board: pub, by: ME }, { qos: 1, retain: true }, link); }
+  function pushAll(){ lastPush = Date.now(); relay.publish(T.board, { board: pub, by: ME }, { qos: 1, retain: true }); }
+  // With every relay down, only a screen in this same browser is still reachable.
+  function liveScreens(){ const now = Date.now(), up = relay.up(); return [...screens.values()].filter(s => now - s.at < 12000 && (up || s.local)); }
+  // A screen that reports an older board missed an update: send it again.
+  setInterval(() => {
+    if(!superseded && pub.rev && liveScreens().some(s => s.rev < pub.rev) && Date.now() - lastPush > 5000) pushAll();
+    renderStatus();
+  }, 3000);
+  function takeBack(){
+    claimAt = Date.now(); superseded = false;
+    relay.publish(T.control, { id: ME, at: claimAt }, { qos: 1, retain: true });
+    renderStatus(); toast('You are in control');
   }
-  function takeBack(){ superseded = false; renderBanner(); client.send({t:'hello', role:'control', pin:CONFIG.CONTROL_PIN}); }
 
   /* ── diff: what Display would change ── */
   function diff(a, b){
@@ -801,12 +835,9 @@ function startControl(){
     [a, b].forEach(x => { Object.values(x.assign).forEach(t => toks.add(t)); x.deskTokens.forEach(t => toks.add(t)); });
     [...toks].sort((p, q) => p - q).forEach(t => {
       const pa = placeOf(a, t), pb = placeOf(b, t);
-      if(samePlace(pa, pb)){
-        // Same station id but the table was renumbered: still worth no line.
-        return;
-      }
+      if(samePlace(pa, pb)) return;
       if(!pa) out.push({k:'add', tok:t, text:`${t} → ${placeText(b, pb)}`});
-      else if(!pb) out.push({k:'rem', tok:t, text:`Remove ${t} from ${placeText(a, pa)}`});
+      else if(!pb) out.push({k:'rem', tok:t, text:`${t} off ${placeText(a, pa)}`});
       else out.push({k:'mov', tok:t, text:`${t}: ${placeText(a, pa)} → ${placeText(b, pb)}`});
     });
     if(a.title !== b.title) out.push({k:'set', text:'Heading changed'});
@@ -820,8 +851,9 @@ function startControl(){
       if(o.color !== t.color) bits.push('colour');
       if(o.x !== t.x || o.y !== t.y) bits.push('moved');
       if(o.stations.length !== t.stations.length) bits.push(`${t.stations.length} stations`);
-      const brkOn = t.stations.filter((s, i) => s.brk && !(o.stations.find(x => x.id === s.id) || {}).brk).map(s => t.num + LETTERS[t.stations.indexOf(s)]);
-      const brkOff = t.stations.filter(s => !s.brk && (o.stations.find(x => x.id === s.id) || {}).brk).map(s => t.num + LETTERS[t.stations.indexOf(s)]);
+      const was = id => (o.stations.find(x => x.id === id) || {}).brk;
+      const brkOn = t.stations.filter(s => s.brk && !was(s.id)).map(s => t.num + LETTERS[t.stations.indexOf(s)]);
+      const brkOff = t.stations.filter(s => !s.brk && was(s.id)).map(s => t.num + LETTERS[t.stations.indexOf(s)]);
       if(brkOn.length) bits.push(brkOn.join(', ') + ' on break');
       if(brkOff.length) bits.push(brkOff.join(', ') + ' back');
       if(bits.length) out.push({k:'set', text:`Table ${t.num}: ${bits.join(' · ')}`});
@@ -845,7 +877,7 @@ function startControl(){
     const prev = draft.assign[sid];
     unplace(draft, tok);
     draft.assign[sid] = tok;
-    toast(`${tok} → ${stationLabel(draft, sid)}` + (prev != null && prev !== tok ? ` (${prev} taken off)` : ''));
+    toast(`${tok} → ${stationLabel(draft, sid)}` + (prev != null && prev !== tok ? ` · ${prev} taken off` : ''));
     commit();
   }
   function toDesk(){
@@ -864,12 +896,8 @@ function startControl(){
   function revertToken(tok){
     const p = placeOf(pub, tok);
     unplace(draft, tok);
-    if(p && p.kind === 'd') draft.deskTokens.push(tok), draft.deskTokens.sort((x, y) => x - y);
-    else if(p && tableOfStation(draft, p.id)){
-      const other = draft.assign[p.id];
-      if(other != null) delete draft.assign[p.id];
-      draft.assign[p.id] = tok;
-    }
+    if(p && p.kind === 'd'){ draft.deskTokens.push(tok); draft.deskTokens.sort((x, y) => x - y); }
+    else if(p && tableOfStation(draft, p.id)) draft.assign[p.id] = tok;
     commit();
   }
   function toggleSel(tok){
@@ -882,179 +910,184 @@ function startControl(){
   /* ── Display / Undo ── */
   function display(){
     const changes = diff(pub, draft);
-    if(!changes.length) return;
+    if(!changes.length || superseded) return;
     const next = clone(draft);
-    // "Just called": newest assignments first, only tokens still on the board.
     const fresh = [], changed = [];
     changes.filter(c => c.k === 'add' || c.k === 'mov').forEach(c => {
       const p = placeOf(next, c.tok);
       fresh.push({t:c.tok, label: p.kind === 'd' ? 'Desk' : stationLabel(next, p.id), color: placeColor(next, p)});
       changed.push(p.kind === 'd' ? 'd:' + c.tok : 's:' + p.id);
     });
-    const still = r => { const p = placeOf(next, r.t); return p && !fresh.some(f => f.t === r.t); };
-    next.recent = fresh.reverse().concat(pub.recent.filter(still)).slice(0, 8);
+    const freshT = new Set(fresh.map(f => f.t));
+    next.recent = fresh.reverse().concat(pub.recent.filter(r => placeOf(next, r.t) && !freshT.has(r.t))).slice(0, 8);
     next.changed = changed;
     next.at = Date.now();
     next.rev = nextRev(pub.rev);
     history.push(clone(pub)); history = history.slice(-10);
     pub = normBoard(next); draft = clone(pub);
-    lastSend = 0; sendPub(); save(); renderAll();
-    toast(linkLive ? 'Sent to the screen' : 'Saved — it will reach the screen once connected');
+    pushAll(); save(); renderAll();
+    toast(relay.up() || liveScreens().length ? 'Sent to the screen' : 'Saved — it will be sent when the connection is back');
   }
   function undo(){
     const prev = history.pop();
     if(!prev) return;
-    const keep = draft;               // pending edits + the undone changes stay in the draft
     const back = normBoard(prev);
     back.rev = nextRev(pub.rev); back.changed = []; back.at = Date.now();
-    pub = back; draft = keep;
-    lastSend = 0; sendPub(); save(); renderAll();
+    pub = back;                       // the draft keeps the undone changes (and any newer edits)
+    pushAll(); save(); renderAll();
     toast('Screen reverted — those changes are back in the draft');
   }
 
-  /* ── rendering ── */
+  /* ── status ── */
+  function connState(){
+    const up = relay.up(), live = liveScreens();
+    const behind = live.filter(s => s.rev < pub.rev).length;
+    const scr = n => `${n} screen${n > 1 ? 's' : ''} connected`;
+    if(superseded) return {cls:'bad', key:'sup', short:'Not in control', long:'Another device is in control', sub:'Take control back to send changes'};
+    if(!up && !live.length) return {cls:'bad', key:'off', short:'Offline', long:'Not connected', sub: window.mqtt ? 'Check this device\'s internet connection' : 'The connection library did not load — reload the page'};
+    if(!live.length) return {cls:'warn', key:'noscreen', short:'Screen not open', long:'Waiting for the screen', sub:'Open this page on the TV with the screen PIN'};
+    if(behind) return {cls:'warn', key:'sending', short:'Sending…', long:'Sending to the screen', sub: scr(live.length)};
+    return {cls:'', key:'ok', short: live.length > 1 ? `${live.length} screens live` : 'Screen live', long:'Screen is up to date', sub: scr(live.length)};
+  }
   function renderStatus(){
-    const dot = $('cDot'), txt = $('cConn');
-    const waiting = pub.rev > ackRev;
-    dot.className = 'cdot' + (linkLive && !superseded ? (waiting ? ' warn' : '') : ' bad');
-    txt.textContent = superseded ? 'Not in control' : linkLive ? (waiting ? 'Sending…' : 'Screen connected') : 'Screen not reachable';
+    const s = connState();
+    $('cDot').className = $('dDot').className = 'dot' + (s.cls ? ' ' + s.cls : '');
+    $('cConn').innerHTML = `<b>${esc(s.short)}</b>`;
+    $('dStat').innerHTML = `<span><b>${esc(s.long)}</b>${esc(s.sub)}</span>`;
     const n = diff(pub, draft).length;
     $('goBtn').disabled = !n || superseded;
-    $('goBtn').textContent = n ? `Display (${n} change${n > 1 ? 's' : ''})` : 'Display';
+    $('goBtn').innerHTML = n ? `Display <span class="cnt">${n}</span>` : 'Display';
     $('undoBtn').disabled = !history.length || superseded;
-    $('dStat').innerHTML = !linkLive ? 'Open the Screen first.<br>Changes are kept here meanwhile.'
-      : waiting ? 'Waiting for the screen<br>to confirm…' : 'Screen is up to date.';
-    renderBanner();
+    renderBanner(s);
+    if(!$('tabSetup').hidden) renderNet();
   }
-  function banner(kind, html, btn, fn){
-    $('cBanner').innerHTML = `<div class="banner ${kind}"><span>${html}</span>${btn ? `<button id="bnBtn">${btn}</button>` : ''}</div>`;
-    if(btn) $('bnBtn').onclick = fn;
+  let bannerKey = '';
+  function renderBanner(s){
+    if(s.key === bannerKey) return;
+    bannerKey = s.key;
+    let html = '';
+    if(s.key === 'sup') html = `<div class="bad"><span><b>Another device has taken control.</b> Only one controller can send to the screen at a time.</span><button id="bnBtn">Take control back</button></div>`;
+    else if(s.key === 'off') html = `<div class="bad"><span><b>No connection.</b> ${esc(s.sub)}. Your changes are kept on this device and sent as soon as it reconnects.</span></div>`;
+    else if(s.key === 'noscreen') html = `<div class="warn"><span><b>The screen isn't open yet.</b> Open this page on the TV and enter the screen PIN — it picks up the board automatically.</span></div>`;
+    $('cBanner').innerHTML = html;
+    const b = $('bnBtn'); if(b) b.onclick = takeBack;
   }
-  function renderBanner(){
-    if(superseded) banner('bad', 'Another device has taken control of the screen. Only one controller can send at a time.', 'Take control back', takeBack);
-    else if(!linkLive) banner('warn', '<b>Screen not reachable.</b> Make sure the screen page is open (PIN ' + '••••' + ') and both devices are online. Your changes are safe here and will be sent when it connects.');
-    else $('cBanner').innerHTML = '';
+  function renderNet(){
+    const live = liveScreens();
+    $('netlist').innerHTML = relay.links.map(l => `<div><span class="dot${l.up ? '' : ' bad'}"></span>Relay ${esc(l.name)} — ${l.up ? 'connected' : 'not connected'}</div>`).join('') +
+      (relay.links.length ? '' : '<div><span class="dot bad"></span>Relay library not loaded — reload the page</div>') +
+      `<div><span class="dot${live.length ? '' : ' warn'}"></span>${live.length ? live.length + ' screen' + (live.length > 1 ? 's' : '') + ' connected' : 'No screen connected'}</div>` +
+      '<p class="hint" style="margin-top:4px">One connected relay is enough. Screens report in every few seconds.</p>';
   }
+
+  /* ── call tab ── */
   function renderCall(){
     $('cTitle').textContent = draft.title;
-    // token grid
     const total = draft.total;
-    let html = '';
-    for(let t = 1; t <= total; t++){
-      const p = placeOf(draft, t), pend = !samePlace(p, placeOf(pub, t));
-      const col = placeColor(draft, p);
+    const onBoard = new Set([...Object.values(draft.assign), ...draft.deskTokens]);
+    const list = [];
+    for(let t = 1; t <= total; t++) list.push(t);
+    [...onBoard].filter(t => t > total).sort((p, q) => p - q).forEach(t => list.push(t));
+    let html = '', shown = 0;
+    list.forEach(t => {
+      const on = onBoard.has(t);
+      if((filter === 'free' && on) || (filter === 'on' && !on)) return;
+      shown++;
+      const p = on ? placeOf(draft, t) : null, col = placeColor(draft, p);
+      const pend = !samePlace(p, placeOf(pub, t));
       const lab = p ? (p.kind === 'd' ? 'FD' : stationLabel(draft, p.id)) : '';
       html += `<button class="tk-b${p ? ' on' : ''}${pend ? ' pend' : ''}${sel.includes(t) ? ' sel' : ''}" data-t="${t}"` +
         (col ? ` style="--c:${col};--ink:${inkOf(col)}"` : '') + ` aria-pressed="${sel.includes(t)}" aria-label="Token ${t}${p ? ', at ' + placeText(draft, p) : ''}">${t}${lab ? `<small>${lab}</small>` : ''}</button>`;
-    }
-    // Tokens on the board beyond the total (total lowered later) still show.
-    const extra = [...Object.values(draft.assign), ...draft.deskTokens].filter(t => t > total).sort((p, q) => p - q);
-    extra.forEach(t => {
-      const p = placeOf(draft, t), col = placeColor(draft, p);
-      html += `<button class="tk-b on${sel.includes(t) ? ' sel' : ''}" data-t="${t}" style="--c:${col};--ink:${inkOf(col)}">${t}<small>${p.kind === 'd' ? 'FD' : stationLabel(draft, p.id)}</small></button>`;
     });
-    $('tgrid').innerHTML = html;
+    $('tgrid').innerHTML = shown ? html : `<p class="hint none">${filter === 'on' ? 'No tokens on the board yet.' : 'Every token is on the board.'}</p>`;
+    $('fcAll').textContent = list.length; $('fcFree').textContent = list.length - onBoard.size; $('fcOn').textContent = onBoard.size;
+    document.querySelectorAll('.chipf').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === filter));
 
-    // selection bar
     const sb = $('selbar');
     if(!sel.length){
-      sb.innerHTML = '<span class="hint">Tap one or more tokens, then tap a station or Front Desk. Tap a placed token to move it or take it off.</span>';
+      sb.innerHTML = '<span class="hint">Tap tokens, then tap a station or Front Desk. Tap a placed token to move it or take it off.</span>';
     }else{
       const placed = sel.filter(t => placeOf(draft, t));
       const one = sel.length === 1 && placed.length === 1 ? placeText(draft, placeOf(draft, sel[0])) : '';
-      sb.innerHTML = '<span>Selected:</span>' + sel.map(t => `<span class="chip">${t}</span>`).join('') +
-        (one ? `<span class="hint">now at ${esc(one)}</span>` : '') +
-        `<span class="sp"></span>` + (placed.length ? `<button class="btn sm danger" id="rmSel">Take off board</button>` : '') +
-        `<span class="hint">${sel.length > 1 ? 'Each station tap uses the next one.' : 'Now tap where it goes.'}</span>`;
+      sb.innerHTML = sel.map(t => `<span class="chip">${t}</span>`).join('') +
+        (one ? `<span class="hint">at ${esc(one)}</span>` : '') + '<span class="sp"></span>' +
+        (placed.length ? `<button class="btn sm danger" id="rmSel">Take off board</button>` : '') +
+        `<span class="hint">${sel.length > 1 ? 'Each station tap uses the next one' : 'Now tap where it goes'}</span>`;
       const rb = $('rmSel'); if(rb) rb.onclick = removeSel;
     }
 
-    // destinations
     const ready = sel.length > 0;
     const tables = draft.tables.slice().sort((p, q) => p.num - q.num);
     $('dest').innerHTML = (tables.length ? tables.map(t => `<div class="dt" style="--c:${t.color}"><div class="dt-h"><i></i>Table ${t.num}</div><div class="sts-b">` +
       t.stations.map((s, k) => {
         const tok = draft.assign[s.id], pend = tok !== pub.assign[s.id];
-        return `<button class="st-b${s.brk ? ' brk' : ''}${pend ? ' pend' : ''}${ready && !s.brk ? ' ready' : ''}" data-s="${s.id}" aria-label="Station ${t.num}${LETTERS[k]}">` +
+        return `<button class="st-b${s.brk ? ' brk' : ''}${pend ? ' pend' : ''}${ready ? ' ready' : ''}" data-s="${s.id}" aria-label="Station ${t.num}${LETTERS[k]}${tok != null ? ', token ' + tok : ''}">` +
           `<span class="l">${t.num}${LETTERS[k]}</span>` +
           (s.brk ? '<span class="v e">Break</span>' : tok != null ? `<span class="v">${tok}</span>` : '<span class="v e">free</span>') + '</button>';
       }).join('') + (t.stations.length ? '' : '<span class="hint">No stations — add some in Setup</span>') + '</div></div>').join('')
       : '<p class="hint">No tables yet — add them in Setup.</p>') +
-      `<div class="dt desk-b"><div class="row"><div class="dt-h" style="margin:0;--c:var(--marigold)"><i></i>Front Desk</div><span class="sp" style="flex:1"></span>` +
-      `<button class="btn sm pri" id="toDesk" ${ready ? '' : 'disabled style="opacity:.45"'}>Send selected here</button></div>` +
+      `<div class="dt desk-b"><div class="row"><div class="dt-h" style="margin:0;--c:var(--gold)"><i></i>Front Desk</div><span style="flex:1"></span>` +
+      `<button class="btn sm pri" id="toDesk" ${ready ? '' : 'disabled'}>Send selected here</button></div>` +
       `<div class="dchips">${draft.deskTokens.map(t => `<button data-t="${t}" class="${!pub.deskTokens.includes(t) ? 'pend' : ''}${sel.includes(t) ? ' sel' : ''}">${t}</button>`).join('') || '<span class="hint">No tokens at the desk</span>'}</div></div>`;
     const td = $('toDesk'); if(td) td.onclick = () => { if(sel.length) toDesk(); };
 
-    // draft list
     const ch = diff(pub, draft);
     $('draft').innerHTML = ch.length ? ch.map(c => `<div class="di"><span class="k ${c.k}">${{add:'New', mov:'Move', rem:'Off', set:'Setup'}[c.k]}</span><span class="t">${esc(c.text)}</span>` +
       (c.tok != null ? `<button class="x" data-undo="${c.tok}" aria-label="Undo this change">✕</button>` : '') + '</div>').join('')
-      : '<div class="empty-note">Nothing waiting. Changes you make appear here until you press Display.</div>';
-    $('discard').disabled = !ch.length; $('discard').style.opacity = ch.length ? 1 : .45;
+      : '<div class="empty-note">Nothing waiting. Changes collect here — the screen only updates when you press <b>Display</b>.</div>';
+    $('discard').disabled = !ch.length;
     renderStatus();
   }
 
   /* ── setup tab ── */
-  function freeCell(){
-    for(let y = 0; y < draft.rows; y++) for(let x = 0; x < draft.cols; x++)
-      if(!occupant(x, y)) return {x, y};
-    draft.rows = Math.min(10, draft.rows + 1);
-    return {x:0, y:draft.rows - 1};
-  }
   function occupant(x, y){
     if(draft.desk.x === x && draft.desk.y === y) return 'desk';
     const t = draft.tables.find(t => t.x === x && t.y === y);
     return t ? t.id : null;
   }
+  function freeCell(){
+    for(let y = 0; y < draft.rows; y++) for(let x = 0; x < draft.cols; x++) if(!occupant(x, y)) return {x, y};
+    if(draft.rows < 10){ draft.rows++; return {x:0, y:draft.rows - 1}; }
+    if(draft.cols < 14){ draft.cols++; return {x:draft.cols - 1, y:0}; }
+    return null;
+  }
   function renderSetup(){
-    const fT = $('fTitle'), fN = $('fTotal');
-    if(document.activeElement !== fT) fT.value = draft.title;
-    if(document.activeElement !== fN) fN.value = draft.total;
-    if(document.activeElement !== $('fCols')) $('fCols').value = draft.cols;
-    if(document.activeElement !== $('fRows')) $('fRows').value = draft.rows;
-
+    $('cTitle').textContent = draft.title;
+    const set = (id, v) => { if(document.activeElement !== $(id)) $(id).value = v; };
+    set('fTitle', draft.title); set('fTotal', draft.total); set('fCols', draft.cols); set('fRows', draft.rows);
     const tables = draft.tables;
-    $('tlist').innerHTML = tables.length ? tables.map(t => `<div class="tbl" style="--c:${t.color}" data-id="${t.id}">
+    const nums = tables.map(t => t.num), dup = [...new Set(nums.filter((n, i) => nums.indexOf(n) !== i))];
+    $('tlist').innerHTML = (dup.length ? `<div class="banner" style="margin:0;padding:0"><div class="warn">Two tables share number ${dup.join(', ')} — guests could be confused.</div></div>` : '') +
+      (tables.length ? tables.map(t => `<div class="tbl" style="--c:${t.color}" data-id="${t.id}">
       <div class="tbl-h"><b>Table</b><input type="number" inputmode="numeric" min="0" max="999" value="${t.num}" data-num aria-label="Table number">
         <span class="sp"></span>
-        <button class="btn sm" data-st="-" ${t.stations.length ? '' : 'disabled'}>− Station</button>
-        <button class="btn sm" data-st="+" ${t.stations.length >= 26 ? 'disabled' : ''}>+ Station</button>
+        <div class="stepper" role="group" aria-label="Stations"><button data-st="-" ${t.stations.length ? '' : 'disabled'} aria-label="Remove a station">−</button><span>${t.stations.length} station${t.stations.length === 1 ? '' : 's'}</span><button data-st="+" ${t.stations.length >= 26 ? 'disabled' : ''} aria-label="Add a station">+</button></div>
         <button class="btn sm danger" data-del>Remove</button></div>
       <div class="sw" role="group" aria-label="Colour">${PALETTE.map(p => `<button style="--c:${p.c}" data-col="${p.c}" aria-pressed="${p.c === t.color}" aria-label="Colour ${p.c}"></button>`).join('')}</div>
       <div class="stl">${t.stations.map((s, k) => `<button class="s${s.brk ? ' brk' : ''}" data-brk="${s.id}">${t.num}${LETTERS[k]}<small>${s.brk ? 'On break' : (draft.assign[s.id] != null ? 'Token ' + draft.assign[s.id] : 'Open')}</small></button>`).join('') || '<span class="hint">No stations yet</span>'}</div>
-    </div>`).join('') : '<p class="hint">No tables yet.</p>';
-    const nums = tables.map(t => t.num), dup = nums.filter((n, i) => nums.indexOf(n) !== i);
-    if(dup.length) $('tlist').insertAdjacentHTML('afterbegin', `<div class="banner warn" style="margin:0">Two tables share number ${[...new Set(dup)].join(', ')} — guests could be confused.</div>`);
-    renderMap();
+    </div>`).join('') : '<p class="hint">No tables yet.</p>');
+    renderMap(); renderNet();
   }
   function renderMap(){
     const ed = $('mapEd');
     ed.style.gridTemplateColumns = `repeat(${draft.cols}, minmax(64px,1fr))`;
     let h = '';
     for(let y = 0; y < draft.rows; y++) for(let x = 0; x < draft.cols; x++) h += `<div class="cell" data-x="${x}" data-y="${y}"></div>`;
+    h += draft.tables.map(t => `<div class="piece" data-p="${t.id}" style="--c:${t.color};--ink:${inkOf(t.color)}">Table ${t.num}<small>${t.stations.length} station${t.stations.length === 1 ? '' : 's'}</small></div>`).join('') +
+      '<div class="piece desk" data-p="desk">Front<br>Desk</div>';
     ed.innerHTML = h;
-    requestAnimationFrame(() => {
-      const pieces = draft.tables.map(t => `<div class="piece" data-p="${t.id}" style="--c:${t.color};--ink:${inkOf(t.color)}">Table ${t.num}<small>${t.stations.length} station${t.stations.length === 1 ? '' : 's'}</small></div>`).join('') +
-        `<div class="piece desk" data-p="desk">Front<br>Desk</div>`;
-      ed.insertAdjacentHTML('beforeend', pieces);
-      placePieces();
-    });
-  }
-  function cellRect(x, y){
-    const c = $('mapEd').querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
-    return c ? {l: c.offsetLeft, t: c.offsetTop, w: c.offsetWidth, h: c.offsetHeight} : null;
+    requestAnimationFrame(placePieces);
   }
   function placePieces(){
-    $('mapEd').querySelectorAll('.piece').forEach(p => {
+    const ed = $('mapEd');
+    ed.querySelectorAll('.piece').forEach(p => {
       const id = p.dataset.p, o = id === 'desk' ? draft.desk : draft.tables.find(t => t.id === id);
-      const r = o && cellRect(o.x, o.y);
-      if(!r){ p.style.display = 'none'; return; }
-      Object.assign(p.style, {display:'flex', left: r.l + 'px', top: r.t + 'px', width: r.w + 'px', height: r.h + 'px'});
+      const c = o && ed.querySelector(`.cell[data-x="${o.x}"][data-y="${o.y}"]`);
+      if(!c){ p.style.display = 'none'; return; }
+      Object.assign(p.style, {display:'flex', left: c.offsetLeft + 'px', top: c.offsetTop + 'px', width: c.offsetWidth + 'px', height: c.offsetHeight + 'px'});
     });
   }
   window.addEventListener('resize', () => { if(!$('tabSetup').hidden) placePieces(); });
-
-  // Drag on the grid (pointer events → works with mouse and touch)
   (function dragging(){
     const ed = $('mapEd');
     let drag = null;
@@ -1077,19 +1110,17 @@ function startControl(){
       if(!drag) return;
       const {p, id, hot} = drag; drag = null;
       p.classList.remove('drag'); p.style.pointerEvents = '';
-      if(hot){
-        hot.classList.remove('hot');
-        const x = +hot.dataset.x, y = +hot.dataset.y;
-        const me = id === 'desk' ? draft.desk : draft.tables.find(t => t.id === id);
-        const other = occupant(x, y);
-        if(other && other !== id){
-          const o = other === 'desk' ? draft.desk : draft.tables.find(t => t.id === other);
-          o.x = me.x; o.y = me.y;
-        }
-        me.x = x; me.y = y;
-        commit(); return;
+      if(!hot){ placePieces(); return; }
+      hot.classList.remove('hot');
+      const x = +hot.dataset.x, y = +hot.dataset.y;
+      const me = id === 'desk' ? draft.desk : draft.tables.find(t => t.id === id);
+      const other = occupant(x, y);
+      if(other && other !== id){
+        const o = other === 'desk' ? draft.desk : draft.tables.find(t => t.id === other);
+        o.x = me.x; o.y = me.y;
       }
-      placePieces();
+      me.x = x; me.y = y;
+      commit();
     };
     ed.addEventListener('pointerup', end);
     ed.addEventListener('pointercancel', end);
@@ -1103,47 +1134,46 @@ function startControl(){
       if(sel.length) return toStation(s.dataset.s);
       const tok = draft.assign[s.dataset.s];
       if(tok != null){ sel = [tok]; renderCall(); }
+      else toast('Pick a token first');
       return;
     }
     const d = e.target.closest('.dchips [data-t]'); if(d) toggleSel(+d.dataset.t);
   });
   $('draft').addEventListener('click', e => { const b = e.target.closest('[data-undo]'); if(b) revertToken(+b.dataset.undo); });
+  document.querySelectorAll('.chipf').forEach(b => b.onclick = () => { filter = b.dataset.f; renderCall(); });
   $('selClear').onclick = () => { sel = []; renderCall(); };
   $('discard').onclick = () => confirmBox('Discard all draft changes?', 'The draft goes back to exactly what is on the screen now.', 'Discard', () => { draft = clone(pub); sel = []; commit(); });
   function parseQuery(v){
     const out = [];
-    v.split(/[\s,]+/).filter(Boolean).forEach(part => {
-      const m = /^(\d+)\s*-\s*(\d+)$/.exec(part);
+    v.replace(/\s*-\s*/g, '-').split(/[\s,]+/).filter(Boolean).forEach(part => {
+      const m = /^(\d+)-(\d+)$/.exec(part);
       if(m){ let a = +m[1], b = +m[2]; if(a > b) [a, b] = [b, a]; for(let i = a; i <= Math.min(b, a + 100); i++) out.push(i); }
       else if(/^\d+$/.test(part)) out.push(+part);
     });
-    return out.filter(t => t >= 1 && t <= Math.max(draft.total, 99999));
+    return out.filter(t => t >= 1 && t <= 99999);
   }
   function runQuery(){
     const ts = parseQuery($('q').value);
     if(!ts.length) return toast('Type a token number, e.g. 46 or 41-45');
     ts.forEach(t => { if(!sel.includes(t)) sel.push(t); });
-    $('q').value = '';
+    $('q').value = ''; filter = 'all';
     renderCall();
     const b = $('tgrid').querySelector(`[data-t="${ts[0]}"]`); if(b) b.scrollIntoView({block:'nearest'});
   }
   $('q').addEventListener('keydown', e => { if(e.key === 'Enter') runQuery(); });
-  // The search field accepts ranges like "41-45", so it is not type=number.
   $('q').addEventListener('input', () => { $('q').value = $('q').value.replace(/[^0-9,\-\s]/g, ''); });
   $('qGo').onclick = runQuery;
   $('goBtn').onclick = display;
   $('undoBtn').onclick = () => confirmBox('Undo the last Display?', 'The screen goes back to how it was before. Those changes stay in your draft so you can fix them and display again.', 'Undo', undo);
   $('cLock').onclick = () => confirmBox('Lock this device?', 'Your draft stays saved here. You will need the PIN to open it again.', 'Lock', lock);
-
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
     document.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-selected', x === b));
     const setup = b.dataset.tab === 'setup';
     $('tabCall').hidden = setup; $('tabSetup').hidden = !setup;
-    setup ? renderSetup() : renderCall();
+    setup ? (renderSetup(), renderStatus()) : renderCall();
     window.scrollTo(0, 0);
   });
-
-  $('fTitle').addEventListener('input', e => { draft.title = e.target.value.slice(0, 70) || CONFIG.TITLE; save(); $('cTitle').textContent = draft.title; renderStatus(); });
+  $('fTitle').addEventListener('input', e => { draft.title = e.target.value.slice(0, 70); save(); $('cTitle').textContent = draft.title || CONFIG.TITLE; renderStatus(); });
   $('fTitle').addEventListener('change', () => commit());
   $('fTotal').addEventListener('change', e => { draft.total = Math.min(2000, Math.max(1, parseInt(e.target.value, 10) || draft.total)); commit(); });
   $('fCols').addEventListener('change', e => resizeGrid(+e.target.value, draft.rows));
@@ -1152,15 +1182,15 @@ function startControl(){
     const items = draft.tables.concat([draft.desk]);
     const needC = Math.max(...items.map(i => i.x)) + 1, needR = Math.max(...items.map(i => i.y)) + 1;
     if((c || 1) < needC || (r || 1) < needR) toast('Move pieces inward before making the plan smaller');
-    c = Math.min(14, Math.max(needC, c || 1)); r = Math.min(10, Math.max(needR, r || 1));
-    draft.cols = c; draft.rows = r; commit();
+    draft.cols = Math.min(14, Math.max(needC, c || 1)); draft.rows = Math.min(10, Math.max(needR, r || 1));
+    commit();
   }
-
   $('addTable').onclick = () => {
+    const cell = freeCell();
+    if(!cell) return toast('The floor plan is full');
     const used = new Set(draft.tables.map(t => t.color));
     const col = (PALETTE.find(p => !used.has(p.c)) || PALETTE[draft.tables.length % PALETTE.length]).c;
     const num = draft.tables.reduce((m, t) => Math.max(m, t.num), 0) + 1;
-    const cell = freeCell();
     draft.tables.push({ id: uid('t'), num, color: col, x: cell.x, y: cell.y, stations: [0,1,2].map(() => ({id: uid('s'), brk:false})) });
     commit(); toast(`Table ${num} added with 3 stations`);
   };
@@ -1198,7 +1228,6 @@ function startControl(){
     if(t && Number.isFinite(n) && n >= 0) t.num = Math.min(999, n);
     commit();
   });
-
   $('clrTokens').onclick = () => confirmBox('Clear all tokens?', 'Every token comes off the board (in the draft). Tables, stations and the map stay. Press Display to update the screen.', 'Clear tokens', () => {
     draft.assign = {}; draft.deskTokens = []; sel = []; commit(); toast('Tokens cleared in the draft — press Display');
   });
@@ -1229,13 +1258,10 @@ function startControl(){
       });
     }catch(err){ toast('That file is not a Mehndi Tokens layout'); }
   };
-
-  // Keyboard: Enter in search selects; Ctrl/⌘+Enter displays.
   document.addEventListener('keydown', e => {
     if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); if(!$('goBtn').disabled) display(); }
-    else if(e.key === 'Escape' && sel.length){ sel = []; renderCall(); }
+    else if(e.key === 'Escape' && sel.length && !$('dlg').open){ sel = []; renderCall(); }
   });
-  // Another tab of the controller on this device.
   window.addEventListener('storage', e => {
     if(e.key === 'mehndi_ctl_pub' || e.key === 'mehndi_ctl_draft'){
       pub = normBoard(LS.get('ctl_pub', null)); draft = normBoard(LS.get('ctl_draft', null) || pub); renderAll();
@@ -1244,7 +1270,6 @@ function startControl(){
 
   function renderAll(){ $('tabSetup').hidden ? renderCall() : (renderSetup(), renderStatus()); }
   save(); renderCall();
-  if(!window.Peer) toast('Running in same-device mode (PeerJS did not load)');
 }
 
 /* ═════════════ shared bits ═════════════ */
@@ -1261,9 +1286,8 @@ function toast(msg){
   clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
 }
 
-/* boot */
-// This tab's role first (a laptop may run Screen and Control side by side),
-// then whatever this device last unlocked.
+/* boot: this tab's role first (a laptop may run Screen and Control side by
+   side), then whatever this device last unlocked. */
 let role = null;
 try{ role = sessionStorage.getItem('mehndi_role'); }catch(e){}
 if(!role) role = LS.get('role', null);
