@@ -264,6 +264,8 @@ input{font:inherit;color:inherit;}
 .line.a .qchips button{background:rgba(24,199,122,.2);border:1px solid rgba(24,199,122,.6);}
 .qchips button.pend::before{content:'';position:absolute;inset:2px;border-radius:7px;border:2px dashed var(--text);opacity:.55;}
 .qchips button.sel{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text);}
+.qchips button:active{transform:scale(.94);}
+.line .qchips button.gone{background:none !important;border:1px dashed rgba(242,95,92,.6) !important;color:#FFB3B1;text-decoration:line-through;opacity:.8;}
 .qchips .hint{padding:8px 2px;}
 .line .foot{margin-top:10px;}
 .line .foot .btn{width:100%;}
@@ -429,7 +431,7 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
           <div class="line a"><h3>Adults <span class="c" id="lAn">0</span></h3><div class="qchips" id="lA"></div>
             <div class="foot"><button class="btn sm act x" id="clearA" style="height:40px">Remove all Adults</button></div></div>
         </div>
-        <p class="hint" style="margin-top:10px">Tap a number to select it, then Remove once that person has come to the desk.</p>
+        <p class="hint" style="margin-top:10px">When someone has come to the desk, <b>tap their number</b> to take it off. Tap a crossed-out number to keep it. Then press Display.</p>
       </div>
       <div class="panel">
         <div class="ph"><span class="n">3</span><h2>Draft</h2><span class="sp"></span><button class="btn sm" id="discard">Discard all</button></div>
@@ -1003,11 +1005,13 @@ function startControl(){
     $('aReady').disabled = !sel.some(t => !R.has(t));
     $('aRemove').disabled = !sel.some(t => R.has(t));
 
-    // ready now, both sets
+    // ready now, both sets: tap a number to take it off (or bring it back)
     ['k', 'a'].forEach(g => {
-      const list = draft[GROUPS[g].list], id = g === 'k' ? 'K' : 'A';
+      const L = GROUPS[g].list, id = g === 'k' ? 'K' : 'A';
+      const list = draft[L], gone = pub[L].filter(t => !list.includes(t));
       $('l' + id + 'n').textContent = list.length;
-      $('l' + id).innerHTML = list.map(t => `<button data-g="${g}" data-t="${t}" class="${isReady(pub, g, t) ? '' : 'pend'}${g === grp && sel.includes(t) ? ' sel' : ''}">${t}</button>`).join('')
+      $('l' + id).innerHTML = list.map(t => `<button data-g="${g}" data-t="${t}" class="${isReady(pub, g, t) ? '' : 'pend'}" aria-label="${GROUPS[g].one} ${t} — tap to remove">${t}</button>`).join('') +
+        gone.map(t => `<button data-g="${g}" data-t="${t}" class="gone" aria-label="${GROUPS[g].one} ${t} — being removed, tap to keep">${t}</button>`).join('')
         || `<span class="hint">None ready</span>`;
       $('clear' + id).disabled = !list.length;
     });
@@ -1031,9 +1035,20 @@ function startControl(){
 
   /* ── wiring ── */
   $('tgrid').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if(b) toggleSel(+b.dataset.t); });
+  // Ready now: one tap takes a token off (shown struck through until Display);
+  // tapping a struck-through one keeps it on the screen after all.
   ['lK', 'lA'].forEach(id => $(id).addEventListener('click', e => {
     const b = e.target.closest('[data-t]'); if(!b) return;
-    setGroup(b.dataset.g); toggleSel(+b.dataset.t);
+    const g = b.dataset.g, t = +b.dataset.t, L = GROUPS[g].list, one = GROUPS[g].one;
+    if(draft[L].includes(t)){
+      draft[L] = draft[L].filter(x => x !== t);
+      sel = sel.filter(x => !(g === grp && x === t));
+      toast(`${one} ${t} will come off — press Display`);
+      commit();
+    }else{
+      revertToken(g, t);
+      toast(`${one} ${t} stays on the screen`);
+    }
   }));
   document.querySelectorAll('.gsw button').forEach(b => b.onclick = () => setGroup(b.dataset.g));
   $('aReady').onclick = readySel;
