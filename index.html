@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   Mehndi Token Board — one file, two views.
-    PIN 7868 → Screen  (the venue TV): the tokens that are READY
+    PIN 7868 → Screen  (the venue TV): READY tokens, Kids and Adults
     PIN 6879 → Control (the front desk): mark tokens Ready, remove them once
                 the person has come to the desk, then press Display.
 
@@ -99,16 +99,16 @@ input{font:inherit;color:inherit;}
   filter:drop-shadow(0 .3vh 1.2vh rgba(255,140,30,.35));}
 .s-head .divider{margin-top:1vh;}
 .s-head .divider::before,.s-head .divider::after{width:20vw;}
-.halves{position:relative;display:grid;grid-template-columns:minmax(0,1fr);width:min(100%,150vh);margin:0 auto;min-height:0;}
+.halves{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:2.4vw;min-height:0;}
 .half{position:relative;display:flex;flex-direction:column;min-height:0;
   border-radius:50% 50% 2.6vh 2.6vh / 10vh 10vh 2.6vh 2.6vh;border:1.5px solid var(--rim);
   box-shadow:0 2vh 5vh rgba(0,0,0,.45),inset 0 0 6vh rgba(0,0,0,.25);padding:2.4vh 2vh 2.6vh;}
 .half::before{content:'';position:absolute;inset:1.1vh;border:1px solid var(--rim2);pointer-events:none;
   border-radius:50% 50% 1.8vh 1.8vh / 9vh 9vh 1.8vh 1.8vh;}
-.half.ready{--rim:rgba(110,231,183,.55);--rim2:rgba(232,196,106,.35);--lbl:#8EF2C6;
+.half.kids{--rim:rgba(255,128,190,.6);--rim2:rgba(232,196,106,.35);--lbl:#FF9FCE;--glow:rgba(255,128,190,.6);
+  background:linear-gradient(180deg,rgba(130,22,86,.6) 0%,rgba(22,10,34,.92) 62%);}
+.half.adults{--rim:rgba(110,231,183,.55);--rim2:rgba(232,196,106,.35);--lbl:#8EF2C6;--glow:rgba(110,231,183,.55);
   background:linear-gradient(180deg,rgba(16,78,60,.62) 0%,rgba(22,10,34,.92) 62%);}
-.half.waiting{--rim:rgba(255,182,39,.5);--rim2:rgba(232,196,106,.28);--lbl:#FFD36B;
-  background:linear-gradient(180deg,rgba(110,52,12,.5) 0%,rgba(22,10,34,.92) 62%);}
 .half .corner{position:absolute;bottom:.4vh;width:13vh;height:13vh;pointer-events:none;opacity:.9;
   background:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' fill='none' stroke='%23E8C46A' stroke-linecap='round'><path d='M6 0 V84 Q6 114 36 114 H120' stroke-width='1.6' opacity='.85'/><path d='M16 0 V78 Q16 104 42 104 H120' stroke-width='1' opacity='.5'/><g transform='translate(34 86)' stroke-width='1.3'><circle r='4.5' fill='%23E8C46A'/><ellipse cy='-10' rx='3.6' ry='6'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(45)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(90)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(135)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(180)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(225)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(270)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(315)'/></g><path d='M50 90 q16 -10 30 -2 q-8 10 -20 6' stroke-width='1.2'/><path d='M30 70 q-10 -16 -2 -30 q10 8 6 20' stroke-width='1.2'/><g fill='%23E8C46A' stroke='none'><circle cx='92' cy='104' r='2.4'/><circle cx='104' cy='104' r='1.8'/><circle cx='114' cy='104' r='1.2'/><circle cx='16' cy='30' r='2.4'/><circle cx='16' cy='18' r='1.8'/><circle cx='16' cy='8' r='1.2'/></g></svg>") no-repeat center/contain;}
 .half .corner.l{left:.4vh;}
@@ -125,11 +125,11 @@ input{font:inherit;color:inherit;}
 .half .sub::after{transform:scaleX(-1);}
 .tiles{position:relative;z-index:1;flex:1;min-height:0;display:grid;gap:1.6vh;padding:1.4vh 2.2vh 4vh;align-content:center;justify-content:center;}
 .tile{position:relative;display:flex;align-items:center;justify-content:center;border-radius:1.6vh;font-weight:800;font-stretch:88%;line-height:1;letter-spacing:-.01em;}
-.ready .tile{color:#FFFBEA;background:linear-gradient(160deg,#22966B 0%,#126247 55%,#0C4A36 100%);border:.25vh solid #E8C46A;
+.half .tile{color:#FFFBEA;border:.25vh solid #E8C46A;
   box-shadow:0 .9vh 2.2vh rgba(0,0,0,.4),inset 0 .3vh 0 rgba(255,255,255,.2);text-shadow:0 .35vh 0 rgba(0,0,0,.25);}
-.ready .tile::before{content:'';position:absolute;inset:.55vh;border:1px solid rgba(255,236,170,.45);border-radius:1.1vh;pointer-events:none;}
-.waiting .tile{color:#F6E2B8;background:linear-gradient(160deg,rgba(255,182,39,.13),rgba(255,182,39,.04));border:1px solid rgba(255,182,39,.34);
-  box-shadow:inset 0 .2vh 0 rgba(255,255,255,.06);font-weight:700;}
+.half .tile::before{content:'';position:absolute;inset:.55vh;border:1px solid rgba(255,236,170,.45);border-radius:1.1vh;pointer-events:none;}
+.adults .tile{background:linear-gradient(160deg,#22966B 0%,#126247 55%,#0C4A36 100%);}
+.kids .tile{background:linear-gradient(160deg,#E2508A 0%,#B3266A 55%,#8A1A52 100%);}
 .tile.more{color:var(--muted) !important;background:none !important;border:1px dashed var(--rim) !important;box-shadow:none !important;
   font-weight:700;font-stretch:100%;text-shadow:none !important;text-align:center;line-height:1.15;}
 .tile.more::before{display:none;}
@@ -137,7 +137,7 @@ input{font:inherit;color:inherit;}
 .tile.new::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
   background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.5) 50%,transparent 65%);background-size:260% 100%;animation:shimmer 2.2s ease-in-out 3;}
 @keyframes shimmer{from{background-position:130% 0}to{background-position:-130% 0}}
-@keyframes glowPulse{50%{box-shadow:0 0 0 .5vh rgba(232,196,106,.55),0 0 5vh rgba(110,231,183,.55)}}
+@keyframes glowPulse{50%{box-shadow:0 0 0 .5vh rgba(232,196,106,.55),0 0 5vh var(--glow)}}
 .tile .pop{display:inline-block;animation:pop .9s cubic-bezier(.2,1.6,.4,1);}
 @keyframes pop{0%{transform:scale(.4);opacity:0;filter:blur(6px)}60%{opacity:1;filter:none}100%{transform:scale(1)}}
 .tile.fade{animation:fadeIn .8s ease both;}
@@ -153,6 +153,15 @@ input{font:inherit;color:inherit;}
 .s-net.quiet{background:none;border-color:transparent;opacity:.5;}
 .s-net.quiet span:last-child{display:none;}
 @media (orientation:portrait){
+  .halves{grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:2vh;}
+  .s-head h1{font-size:clamp(20px,5vw,64px);}
+  .s-head .t svg{width:4vh;height:4vh;}
+  .half{padding:1.6vh 2vh 2vh;}
+  .half .crown{width:3.4vh;height:3.4vh;}
+  .half .hh h2{font-size:clamp(22px,4.6vh,80px);}
+  .half .hh .cnt{min-width:4.2vh;height:4.2vh;font-size:clamp(13px,2.2vh,32px);}
+  .half .sub{font-size:clamp(11px,1.6vh,24px);margin:.6vh 0 .2vh;}
+  .half .corner{width:9vh;height:9vh;}
   .half{border-radius:50% 50% 2.6vh 2.6vh / 6vh 6vh 2.6vh 2.6vh;}
   .half::before{border-radius:50% 50% 1.8vh 1.8vh / 5vh 5vh 1.8vh 1.8vh;}
 }
@@ -225,7 +234,15 @@ input{font:inherit;color:inherit;}
 .tk-b.r{background:linear-gradient(160deg,#22966B,#126247);border-color:rgba(232,196,106,.7);color:#FFFBEA;}
 .tk-b.pend::before{content:'';position:absolute;inset:3px;border-radius:7px;border:2px dashed currentColor;opacity:.75;}
 .tk-b.sel{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text);z-index:1;}
-.tk-b.sel:not(.w):not(.r){background:var(--magenta);color:#fff;border-color:transparent;}
+.tk-b.sel:not(.r){background:var(--text);color:#2A0A12;border-color:transparent;}
+.tgrid.k .tk-b.r{background:linear-gradient(160deg,#E2508A,#B3266A);border-color:rgba(232,196,106,.7);color:#fff;}
+.gsw{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:12px;background:rgba(0,0,0,.25);margin-bottom:12px;}
+.gsw button{height:44px;border-radius:9px;font-weight:800;font-size:15px;color:var(--muted);letter-spacing:.02em;transition:background .15s,color .15s;}
+.gsw button.k[aria-selected="true"]{background:linear-gradient(160deg,#E2508A,#B3266A);color:#fff;}
+.gsw button.a[aria-selected="true"]{background:linear-gradient(160deg,#22966B,#126247);color:#FFFBEA;}
+#aReady.k{background:rgba(226,80,138,.2);border-color:rgba(226,80,138,.65);color:#FFB3D6;}
+#aReady.k:hover:not(:disabled){background:rgba(226,80,138,.3);}
+.actbar .chip.k{background:#B3266A;} .actbar .chip.a{background:#126247;}
 .tgrid .none{grid-column:1/-1;padding:16px 4px;}
 .legend{display:none;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:11.5px;color:var(--dim);font-weight:700;}
 .legend span{display:inline-flex;align-items:center;gap:6px;}
@@ -239,12 +256,12 @@ input{font:inherit;color:inherit;}
 .lines{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .line{border-radius:var(--r);background:rgba(0,0,0,.18);padding:12px;min-width:0;display:flex;flex-direction:column;}
 .line h3{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;}
-.line.w h3{color:var(--gold);} .line.r h3{color:#7BE7B0;}
+.line.k h3{color:#FF9FCE;} .line.a h3{color:#7BE7B0;}
 .line h3 .c{display:inline-grid;place-items:center;min-width:24px;height:22px;padding:0 7px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px;letter-spacing:0;color:var(--text);}
 .qchips{display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;min-height:40px;max-height:280px;overflow:auto;}
 .qchips button{position:relative;min-width:46px;padding:8px 10px;border-radius:9px;font-weight:900;font-size:15px;}
-.line.w .qchips button{background:rgba(255,182,39,.16);border:1px solid rgba(255,182,39,.5);}
-.line.r .qchips button{background:rgba(24,199,122,.2);border:1px solid rgba(24,199,122,.6);}
+.line.k .qchips button{background:rgba(226,80,138,.2);border:1px solid rgba(226,80,138,.6);}
+.line.a .qchips button{background:rgba(24,199,122,.2);border:1px solid rgba(24,199,122,.6);}
 .qchips button.pend::before{content:'';position:absolute;inset:2px;border-radius:7px;border:2px dashed var(--text);opacity:.55;}
 .qchips button.sel{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--text);}
 .qchips .hint{padding:8px 2px;}
@@ -254,7 +271,7 @@ input{font:inherit;color:inherit;}
 .draft{display:grid;gap:6px;}
 .di{display:flex;align-items:center;gap:10px;padding:7px 6px 7px 10px;border-radius:10px;background:rgba(0,0,0,.18);font-size:14px;font-weight:600;}
 .di .k{flex:0 0 auto;font-size:10.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:6px;min-width:58px;text-align:center;}
-.di .k.w{background:rgba(255,182,39,.16);color:var(--gold);}
+.di .k.kids{background:rgba(226,80,138,.2);color:#FFB3D6;}
 .di .k.r{background:rgba(24,199,122,.16);color:#7BE7B0;}
 .di .k.rem{background:rgba(242,95,92,.16);color:#FFB3B1;}
 .di .k.set{background:rgba(155,93,229,.2);color:#D7B8FF;}
@@ -333,12 +350,19 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
     <div class="divider" aria-hidden="true"><i></i></div>
   </header>
   <div class="halves">
-    <section class="half ready" aria-live="polite">
+    <section class="half kids" aria-live="polite">
       <span class="corner l" aria-hidden="true"></span><span class="corner r" aria-hidden="true"></span>
       <svg class="crown" viewBox="-50 -50 100 100" aria-hidden="true"></svg>
-      <div class="hh"><h2>Ready</h2><span class="cnt" id="sReadyN">0</span></div>
-      <div class="sub">Please come to the front desk</div>
-      <div class="tiles" id="sReady"></div>
+      <div class="hh"><h2>Kids</h2><span class="cnt" id="sKidsN">0</span></div>
+      <div class="sub">Ready — please come to the front desk</div>
+      <div class="tiles" id="sKids"></div>
+    </section>
+    <section class="half adults" aria-live="polite">
+      <span class="corner l" aria-hidden="true"></span><span class="corner r" aria-hidden="true"></span>
+      <svg class="crown" viewBox="-50 -50 100 100" aria-hidden="true"></svg>
+      <div class="hh"><h2>Adults</h2><span class="cnt" id="sAdultsN">0</span></div>
+      <div class="sub">Ready — please come to the front desk</div>
+      <div class="tiles" id="sAdults"></div>
     </section>
   </div>
   <div class="s-net quiet" id="sNet"><span class="dot warn" id="sDot"></span><span id="sNetT">Connecting…</span></div>
@@ -369,6 +393,10 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
     <div class="col">
       <div class="panel">
         <div class="ph"><span class="n">1</span><h2>Pick tokens</h2><span class="sp"></span><button class="btn sm" id="selClear">Clear selection</button></div>
+        <div class="gsw" role="tablist" aria-label="Which tokens">
+          <button role="tab" class="k" data-g="k" aria-selected="false">Kids</button>
+          <button role="tab" class="a" data-g="a" aria-selected="true">Adults</button>
+        </div>
         <div class="search">
           <input id="q" inputmode="numeric" autocomplete="off" placeholder="e.g. 46 or 41-45" aria-label="Find tokens">
           <button class="btn pri" id="qGo">Select</button>
@@ -395,8 +423,12 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
     <div class="col col-r">
       <div class="panel">
         <div class="ph"><span class="n">2</span><h2>Ready now</h2></div>
-        <div class="line r"><h3>On the screen <span class="c" id="lRn">0</span></h3><div class="qchips" id="lR"></div>
-          <div class="foot"><button class="btn sm act x" id="clearReady" style="height:40px">Remove all Ready</button></div></div>
+        <div class="lines">
+          <div class="line k"><h3>Kids <span class="c" id="lKn">0</span></h3><div class="qchips" id="lK"></div>
+            <div class="foot"><button class="btn sm act x" id="clearK" style="height:40px">Remove all Kids</button></div></div>
+          <div class="line a"><h3>Adults <span class="c" id="lAn">0</span></h3><div class="qchips" id="lA"></div>
+            <div class="foot"><button class="btn sm act x" id="clearA" style="height:40px">Remove all Adults</button></div></div>
+        </div>
         <p class="hint" style="margin-top:10px">Tap a number to select it, then Remove once that person has come to the desk.</p>
       </div>
       <div class="panel">
@@ -411,7 +443,10 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
     <div class="panel">
       <div class="ph"><h2>Event</h2></div>
       <div class="field"><label for="fTitle">Heading on screen</label><input id="fTitle" maxlength="70"></div>
-      <div class="field" style="margin:0"><label for="fTotal">Tokens issued (1 to …)</label><input id="fTotal" type="number" inputmode="numeric" min="1" max="2000"></div>
+      <div class="lines" style="gap:12px">
+        <div class="field" style="margin:0"><label for="fTotalKids">Kids tokens (1 to …)</label><input id="fTotalKids" type="number" inputmode="numeric" min="1" max="2000"></div>
+        <div class="field" style="margin:0"><label for="fTotal">Adult tokens (1 to …)</label><input id="fTotal" type="number" inputmode="numeric" min="1" max="2000"></div>
+      </div>
     </div>
     <div class="panel">
       <div class="ph"><h2>Connection</h2></div>
@@ -419,7 +454,7 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
     </div>
     <div class="panel">
       <div class="ph"><h2>Start over</h2></div>
-      <p class="hint" style="margin-bottom:12px">Clears every token from the Ready list (in the draft). The screen only changes when you press Display.</p>
+      <p class="hint" style="margin-bottom:12px">Clears every Kids and Adult token from the screen (in the draft). The screen only changes when you press Display.</p>
       <button class="btn danger" id="clrAll">Clear all tokens</button>
     </div>
   </div>
@@ -449,7 +484,8 @@ const CONFIG = {
   CONTROL_PIN: '6879',
   TITLE:       'Salgirah Celebration Night Mehndi',
   EVENT_ID:    'salgirah-mehndi-line-q7x3k9-2026',
-  TOKENS:      300,
+  TOKENS:      300,        // adult tokens 1..300
+  KID_TOKENS:  150,        // kids tokens 1..150 (a separate set of numbers)
   // Size of the number tiles on the screen: 1 = as big as they fit,
   // 0.75 = three-quarters of that. Lower it for smaller tiles.
   TILE_SCALE:  0.75,
@@ -475,26 +511,30 @@ const LS = {
 };
 
 /* ─── Board model ──────────────────────────────────────────────────
-   { rev, title, total, waiting:[token…], ready:[token…], changed:[keys], at }
-   Both lists keep line order (oldest first). A token is in at most one. */
-function emptyBoard(){ return { rev:0, title:CONFIG.TITLE, total:CONFIG.TOKENS, waiting:[], ready:[], changed:[], at:0 }; }
+   { rev, title, total, totalKids, ready:[adult token…], kids:[kids token…], changed:['a:12','k:3'], at }
+   Kids and adults are separate sets of numbers. Lists keep the order tokens
+   were made ready. `ready` holds the adults so older saved boards still load. */
+const GROUPS = {
+  k: { list: 'kids',  total: 'totalKids', name: 'Kids',   one: 'Kids'  },
+  a: { list: 'ready', total: 'total',     name: 'Adults', one: 'Adult' }
+};
+function emptyBoard(){ return { rev:0, title:CONFIG.TITLE, total:CONFIG.TOKENS, totalKids:CONFIG.KID_TOKENS, ready:[], kids:[], changed:[], at:0 }; }
 function normBoard(b){
   const d = emptyBoard();
   if(!b || typeof b !== 'object') return d;
   const int = (v, def, lo, hi) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def; };
-  const seen = new Set();
-  const list = a => (Array.isArray(a) ? a : []).map(v => int(v, null, 1, 99999)).filter(t => t != null && !seen.has(t) && seen.add(t)).slice(0, 2000);
-  const ready = list(b.ready), waiting = list(b.waiting);
+  const list = a => { const seen = new Set(); return (Array.isArray(a) ? a : []).map(v => int(v, null, 1, 99999)).filter(t => t != null && !seen.has(t) && seen.add(t)).slice(0, 2000); };
   return {
     rev: int(b.rev, 0, 0, Number.MAX_SAFE_INTEGER),
     title: typeof b.title === 'string' && b.title.trim() ? b.title.slice(0, 70) : d.title,
     total: int(b.total, d.total, 1, 2000),
-    waiting: [], ready,
+    totalKids: int(b.totalKids, d.totalKids, 1, 2000),
+    ready: list(b.ready), kids: list(b.kids),
     changed: (Array.isArray(b.changed) ? b.changed : []).slice(0, 400).map(String),
     at: int(b.at, 0, 0, Number.MAX_SAFE_INTEGER)
   };
 }
-const stateOf = (b, t) => b.ready.includes(t) ? 'r' : b.waiting.includes(t) ? 'w' : null;
+const isReady = (b, g, t) => b[GROUPS[g].list].includes(t);
 const nextRev = prev => Math.max(Date.now(), (prev || 0) + 1);
 
 /* ═════════════ RELAY ═════════════
@@ -698,7 +738,7 @@ function startScreen(){
       return { c, r, cw, ch, fs: Math.min(cw / (0.6 * digits + 0.8), ch * 0.62, H * 0.42) * scale };
     };
     const scale = Math.min(1, Math.max(0.4, +CONFIG.TILE_SCALE || 1));
-    const minFs = Math.max(18, window.innerHeight * 0.045);
+    const minFs = Math.max(18, Math.min(window.innerHeight, window.innerWidth) * 0.045);
     let n = list.length, best = null;
     for(let c = 1; c <= Math.max(1, n); c++){ const s = sizeFor(c, n); if(!best || s.fs > best.fs) best = s; }
     let shown = list, more = 0;
@@ -723,8 +763,7 @@ function startScreen(){
     const changed = new Set(animate ? board.changed : []);
     box.innerHTML = shown.map(t => {
       const hot = changed.has(kind + ':' + t);
-      const cls = hot ? (kind === 'r' ? ' new' : ' fade') : '';
-      return `<div class="tile${cls}" style="font-size:${Math.floor(best.fs)}px"><span class="${hot && kind === 'r' ? 'pop' : ''}">${t}</span></div>`;
+      return `<div class="tile${hot ? ' new' : ''}" style="font-size:${Math.floor(best.fs)}px"><span class="${hot ? 'pop' : ''}">${t}</span></div>`;
     }).join('') + (more ? `<div class="tile more" style="font-size:${Math.floor(best.fs * .42)}px">+${more}<br>more</div>` : '');
   }
   function renderHalf(boxId, cntId, list, kind, emptyText){
@@ -739,7 +778,8 @@ function startScreen(){
   }
   function render(){
     $('sTitle').textContent = board.title;
-    renderHalf('sReady', 'sReadyN', board.ready, 'r', 'Ready tokens will appear here — please keep your token handy');
+    renderHalf('sKids', 'sKidsN', board.kids, 'k', 'Kids tokens will appear here');
+    renderHalf('sAdults', 'sAdultsN', board.ready, 'a', 'Adult tokens will appear here');
     animate = false;
   }
   let rT; window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(render, 150); });
@@ -814,49 +854,55 @@ function startControl(){
   }
 
   /* ── diff: what Display would change ── */
-  const NAME = { w: 'Waiting', r: 'Ready' };
+  let grp = LS.get('ctl_grp', 'k') === 'a' ? 'a' : 'k';     // which set the grid is showing
   function diff(a, b){
     const out = [];
-    const toks = new Set([...a.waiting, ...a.ready, ...b.waiting, ...b.ready]);
-    [...toks].sort((p, q) => p - q).forEach(t => {
-      const sa = stateOf(a, t), sb = stateOf(b, t);
-      if(sa === sb) return;
-      if(!sb) out.push({k:'rem', tok:t, text:`${t} removed (was ${NAME[sa]})`});
-      else if(sb === 'w') out.push({k:'w', tok:t, text: sa === 'r' ? `${t} back to Waiting` : `${t} → Waiting`});
-      else out.push({k:'r', tok:t, text:`${t} → Ready`});
+    ['k', 'a'].forEach(g => {
+      const L = GROUPS[g].list, one = GROUPS[g].one;
+      const A = new Set(a[L]), B = new Set(b[L]);
+      [...new Set([...A, ...B])].sort((p, q) => p - q).forEach(t => {
+        if(A.has(t) === B.has(t)) return;
+        out.push(B.has(t) ? {k:'r', g, tok:t, text:`${one} ${t} → Ready`} : {k:'rem', g, tok:t, text:`${one} ${t} removed`});
+      });
     });
     if(a.title !== b.title) out.push({k:'set', text:'Heading changed'});
-    if(a.total !== b.total) out.push({k:'set', text:`Tokens now 1–${b.total}`});
+    if(a.totalKids !== b.totalKids) out.push({k:'set', text:`Kids tokens now 1–${b.totalKids}`});
+    if(a.total !== b.total) out.push({k:'set', text:`Adult tokens now 1–${b.total}`});
     return out;
   }
 
-  /* ── moves (all on the draft) ── */
-  function unplace(b, t){ b.waiting = b.waiting.filter(x => x !== t); b.ready = b.ready.filter(x => x !== t); }
-  function moveSel(to){
-    const ts = sel.filter(t => stateOf(draft, t) !== to);
+  /* ── moves (all on the draft, for the selected set) ── */
+  const L = () => GROUPS[grp].list;
+  function readySel(){
+    const ts = sel.filter(t => !isReady(draft, grp, t));
     if(!ts.length) return;
-    ts.forEach(t => { unplace(draft, t); draft[to === 'w' ? 'waiting' : 'ready'].push(t); });
-    toast(ts.length === 1 ? `${ts[0]} → ${NAME[to]}` : `${ts.length} tokens → ${NAME[to]}`);
+    ts.forEach(t => draft[L()].push(t));
+    const one = GROUPS[grp].one;
+    toast(ts.length === 1 ? `${one} ${ts[0]} → Ready` : `${ts.length} ${one.toLowerCase()} tokens → Ready`);
     sel = []; commit();
   }
   function removeSel(){
-    const ts = sel.filter(t => stateOf(draft, t));
+    const ts = sel.filter(t => isReady(draft, grp, t));
     if(!ts.length) return;
-    ts.forEach(t => unplace(draft, t));
-    toast(ts.length === 1 ? `${ts[0]} removed` : `${ts.length} tokens removed`);
+    draft[L()] = draft[L()].filter(t => !ts.includes(t));
+    toast(ts.length === 1 ? `${GROUPS[grp].one} ${ts[0]} removed` : `${ts.length} tokens removed`);
     sel = []; commit();
   }
-  function revertToken(t){
-    const s = stateOf(pub, t);
-    unplace(draft, t);
-    if(s){
-      const list = s === 'w' ? 'waiting' : 'ready';
-      // put it back where it was in the line
+  function revertToken(g, t){
+    const list = GROUPS[g].list;
+    draft[list] = draft[list].filter(x => x !== t);
+    if(pub[list].includes(t)){
+      // put it back where it was in the list
       const before = pub[list].slice(0, pub[list].indexOf(t)).filter(x => draft[list].includes(x));
       const at = before.length ? draft[list].indexOf(before[before.length - 1]) + 1 : 0;
       draft[list].splice(at, 0, t);
     }
     commit();
+  }
+  function setGroup(g){
+    if(g === grp) return;
+    grp = g; sel = []; filter = 'all'; LS.set('ctl_grp', g);
+    renderCall();
   }
   function toggleSel(t){ const i = sel.indexOf(t); if(i >= 0) sel.splice(i, 1); else sel.push(t); renderCall(); }
   function commit(){ draft = normBoard(draft); save(); renderAll(); }
@@ -866,7 +912,7 @@ function startControl(){
     const changes = diff(pub, draft);
     if(!changes.length || superseded) return;
     const next = clone(draft);
-    next.changed = changes.filter(c => c.k === 'w' || c.k === 'r').map(c => c.k + ':' + c.tok);
+    next.changed = changes.filter(c => c.k === 'r').map(c => c.g + ':' + c.tok);
     next.at = Date.now();
     next.rev = nextRev(pub.rev);
     history.push(clone(pub)); history = history.slice(-15);
@@ -929,43 +975,48 @@ function startControl(){
   /* ── tokens tab ── */
   function renderCall(){
     $('cTitle').textContent = draft.title;
-    const W = new Set(draft.waiting), R = new Set(draft.ready);
+    const G = GROUPS[grp], total = draft[G.total];
+    const R = new Set(draft[G.list]);
+    document.querySelectorAll('.gsw button').forEach(b => b.setAttribute('aria-selected', b.dataset.g === grp));
     const list = [];
-    for(let t = 1; t <= draft.total; t++) list.push(t);
-    [...W, ...R].filter(t => t > draft.total).sort((p, q) => p - q).forEach(t => list.push(t));
+    for(let t = 1; t <= total; t++) list.push(t);
+    [...R].filter(t => t > total).sort((p, q) => p - q).forEach(t => list.push(t));
     let html = '', shown = 0;
     list.forEach(t => {
-      const s = R.has(t) ? 'r' : W.has(t) ? 'w' : null;
-      if(filter === 'none' && s) return;
-      if((filter === 'w' || filter === 'r') && s !== filter) return;
+      const on = R.has(t);
+      if((filter === 'none' && on) || (filter === 'r' && !on)) return;
       shown++;
-      const pend = s !== stateOf(pub, t);
-      html += `<button class="tk-b${s ? ' ' + s : ''}${pend ? ' pend' : ''}${sel.includes(t) ? ' sel' : ''}" data-t="${t}" aria-pressed="${sel.includes(t)}" aria-label="Token ${t}${s ? ', ' + NAME[s] : ''}">${t}</button>`;
+      const pend = on !== isReady(pub, grp, t);
+      html += `<button class="tk-b${on ? ' r' : ''}${pend ? ' pend' : ''}${sel.includes(t) ? ' sel' : ''}" data-t="${t}" aria-pressed="${sel.includes(t)}" aria-label="${G.one} token ${t}${on ? ', ready' : ''}">${t}</button>`;
     });
+    $('tgrid').className = 'tgrid ' + grp;
     $('tgrid').innerHTML = shown ? html : `<p class="hint none">Nothing here.</p>`;
-    $('fcAll').textContent = list.length; $('fcNone').textContent = list.length - W.size - R.size;
-    $('fcR').textContent = R.size;
+    $('fcAll').textContent = list.length; $('fcNone').textContent = list.length - R.size; $('fcR').textContent = R.size;
     document.querySelectorAll('.chipf').forEach(b => b.setAttribute('aria-pressed', b.dataset.f === filter));
+    $('q').placeholder = `${G.one} token, e.g. 46 or 41-45`;
 
     // selection + actions
-    const states = sel.map(t => stateOf(draft, t));
     $('selrow').innerHTML = sel.length
-      ? '<span class="hint" style="margin-right:2px">Selected</span>' + sel.map(t => `<span class="chip">${t}</span>`).join('')
-      : '<span class="hint">Tap tokens above, then choose what happens to them.</span>';
-    $('aReady').disabled = !states.some(s => s !== 'r');
-    $('aRemove').disabled = !states.some(s => s);
+      ? `<span class="hint" style="margin-right:2px">${G.name} selected</span>` + sel.map(t => `<span class="chip ${grp}">${t}</span>`).join('')
+      : `<span class="hint">Tap ${G.one.toLowerCase()} tokens above, then choose what happens to them.</span>`;
+    $('aReady').className = 'btn act r ' + grp;
+    $('aReady').disabled = !sel.some(t => !R.has(t));
+    $('aRemove').disabled = !sel.some(t => R.has(t));
 
-    // the line
-    const chip = (t, kind) => `<button data-t="${t}" class="${stateOf(pub, t) !== kind ? 'pend' : ''}${sel.includes(t) ? ' sel' : ''}">${t}</button>`;
-    $('lRn').textContent = draft.ready.length;
-    $('lR').innerHTML = draft.ready.map(t => chip(t, 'r')).join('') || '<span class="hint">None ready</span>';
-    $('clearReady').disabled = !draft.ready.length;
+    // ready now, both sets
+    ['k', 'a'].forEach(g => {
+      const list = draft[GROUPS[g].list], id = g === 'k' ? 'K' : 'A';
+      $('l' + id + 'n').textContent = list.length;
+      $('l' + id).innerHTML = list.map(t => `<button data-g="${g}" data-t="${t}" class="${isReady(pub, g, t) ? '' : 'pend'}${g === grp && sel.includes(t) ? ' sel' : ''}">${t}</button>`).join('')
+        || `<span class="hint">None ready</span>`;
+      $('clear' + id).disabled = !list.length;
+    });
 
     // draft
     const ch = diff(pub, draft);
-    const KL = { w:'Waiting', r:'Ready', rem:'Removed', set:'Setup' };
-    $('draft').innerHTML = ch.length ? ch.map(c => `<div class="di"><span class="k ${c.k}">${KL[c.k]}</span><span class="t">${esc(c.text)}</span>` +
-      (c.tok != null ? `<button class="x" data-undo="${c.tok}" aria-label="Undo this change">✕</button>` : '') + '</div>').join('')
+    const KL = { r:'Ready', rem:'Removed', set:'Setup' };
+    $('draft').innerHTML = ch.length ? ch.map(c => `<div class="di"><span class="k ${c.k === 'r' && c.g === 'k' ? 'kids' : c.k}">${KL[c.k]}</span><span class="t">${esc(c.text)}</span>` +
+      (c.tok != null ? `<button class="x" data-undo="${c.g}:${c.tok}" aria-label="Undo this change">✕</button>` : '') + '</div>').join('')
       : '<div class="empty-note">No changes yet. Changes collect here — the screen only updates when you press <b>Display</b>.</div>';
     $('discard').disabled = !ch.length;
     renderStatus();
@@ -974,18 +1025,26 @@ function startControl(){
     $('cTitle').textContent = draft.title;
     if(document.activeElement !== $('fTitle')) $('fTitle').value = draft.title;
     if(document.activeElement !== $('fTotal')) $('fTotal').value = draft.total;
+    if(document.activeElement !== $('fTotalKids')) $('fTotalKids').value = draft.totalKids;
     renderNet();
   }
 
   /* ── wiring ── */
   $('tgrid').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if(b) toggleSel(+b.dataset.t); });
-  ['lR'].forEach(id => $(id).addEventListener('click', e => { const b = e.target.closest('[data-t]'); if(b) toggleSel(+b.dataset.t); }));
-  $('aReady').onclick = () => moveSel('r');
+  ['lK', 'lA'].forEach(id => $(id).addEventListener('click', e => {
+    const b = e.target.closest('[data-t]'); if(!b) return;
+    setGroup(b.dataset.g); toggleSel(+b.dataset.t);
+  }));
+  document.querySelectorAll('.gsw button').forEach(b => b.onclick = () => setGroup(b.dataset.g));
+  $('aReady').onclick = readySel;
   $('aRemove').onclick = removeSel;
-  $('clearReady').onclick = () => confirmBox('Remove all Ready tokens?', `${draft.ready.length} token${draft.ready.length === 1 ? '' : 's'} will come off the screen (after you press Display).`, 'Remove', () => {
-    draft.ready = []; sel = []; commit(); toast('Ready list cleared in the draft');
+  [['clearK', 'k'], ['clearA', 'a']].forEach(([id, g]) => $(id).onclick = () => {
+    const G = GROUPS[g], n = draft[G.list].length;
+    confirmBox(`Remove all ${G.name} tokens?`, `${n} ${G.name.toLowerCase()} token${n === 1 ? '' : 's'} will come off the screen (after you press Display).`, 'Remove', () => {
+      draft[G.list] = []; if(g === grp) sel = []; commit(); toast(`${G.name} cleared in the draft`);
+    });
   });
-  $('draft').addEventListener('click', e => { const b = e.target.closest('[data-undo]'); if(b) revertToken(+b.dataset.undo); });
+  $('draft').addEventListener('click', e => { const b = e.target.closest('[data-undo]'); if(!b) return; const [g, t] = b.dataset.undo.split(':'); revertToken(g, +t); });
   document.querySelectorAll('.chipf').forEach(b => b.onclick = () => { filter = b.dataset.f; renderCall(); });
   $('selClear').onclick = () => { sel = []; renderCall(); };
   $('discard').onclick = () => confirmBox('Discard all draft changes?', 'The draft goes back to exactly what is on the screen now.', 'Discard', () => { draft = clone(pub); sel = []; commit(); });
@@ -1022,8 +1081,9 @@ function startControl(){
   $('fTitle').addEventListener('input', e => { draft.title = e.target.value.slice(0, 70); save(); $('cTitle').textContent = draft.title || CONFIG.TITLE; renderStatus(); });
   $('fTitle').addEventListener('change', () => commit());
   $('fTotal').addEventListener('change', e => { draft.total = Math.min(2000, Math.max(1, parseInt(e.target.value, 10) || draft.total)); commit(); });
-  $('clrAll').onclick = () => confirmBox('Clear all tokens?', 'Every token comes off the Ready list (in the draft). Press Display to update the screen.', 'Clear all', () => {
-    draft.waiting = []; draft.ready = []; sel = []; commit(); toast('All tokens cleared in the draft — press Display');
+  $('fTotalKids').addEventListener('change', e => { draft.totalKids = Math.min(2000, Math.max(1, parseInt(e.target.value, 10) || draft.totalKids)); commit(); });
+  $('clrAll').onclick = () => confirmBox('Clear all tokens?', 'Every Kids and Adult token comes off the screen (in the draft). Press Display to update the screen.', 'Clear all', () => {
+    draft.kids = []; draft.ready = []; sel = []; commit(); toast('All tokens cleared in the draft — press Display');
   });
   document.addEventListener('keydown', e => {
     if($('dlg').open) return;
@@ -1031,7 +1091,9 @@ function startControl(){
     if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); if(!$('goBtn').disabled) display(); return; }
     if(typing || $('tabCall').hidden) return;
     if(e.key === 'Escape' && sel.length){ sel = []; renderCall(); }
-    else if((e.key === 'r' || e.key === 'R') && !$('aReady').disabled) moveSel('r');
+    else if((e.key === 'r' || e.key === 'R') && !$('aReady').disabled) readySel();
+    else if(e.key === 'k' || e.key === 'K') setGroup('k');
+    else if(e.key === 'a' || e.key === 'A') setGroup('a');
     else if((e.key === 'Delete' || e.key === 'Backspace') && !$('aRemove').disabled){ e.preventDefault(); removeSel(); }
   });
   window.addEventListener('storage', e => {
