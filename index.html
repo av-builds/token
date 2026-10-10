@@ -16,7 +16,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#14041C">
+<meta name="theme-color" content="#FBF4EA">
 <title>Mehndi Tokens</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Yatra+One&display=swap" rel="stylesheet">
@@ -110,7 +110,7 @@ input{font:inherit;color:inherit;}
 .half.adults{--rim:rgba(110,231,183,.55);--rim2:rgba(232,196,106,.35);--lbl:#8EF2C6;--glow:rgba(110,231,183,.55);
   background:linear-gradient(180deg,rgba(16,78,60,.62) 0%,rgba(22,10,34,.92) 62%);}
 .half .corner{position:absolute;bottom:.4vh;width:13vh;height:13vh;pointer-events:none;opacity:.9;
-  background:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' fill='none' stroke='%23E8C46A' stroke-linecap='round'><path d='M6 0 V84 Q6 114 36 114 H120' stroke-width='1.6' opacity='.85'/><path d='M16 0 V78 Q16 104 42 104 H120' stroke-width='1' opacity='.5'/><g transform='translate(34 86)' stroke-width='1.3'><circle r='4.5' fill='%23E8C46A'/><ellipse cy='-10' rx='3.6' ry='6'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(45)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(90)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(135)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(180)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(225)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(270)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(315)'/></g><path d='M50 90 q16 -10 30 -2 q-8 10 -20 6' stroke-width='1.2'/><path d='M30 70 q-10 -16 -2 -30 q10 8 6 20' stroke-width='1.2'/><g fill='%23E8C46A' stroke='none'><circle cx='92' cy='104' r='2.4'/><circle cx='104' cy='104' r='1.8'/><circle cx='114' cy='104' r='1.2'/><circle cx='16' cy='30' r='2.4'/><circle cx='16' cy='18' r='1.8'/><circle cx='16' cy='8' r='1.2'/></g></svg>") no-repeat center/contain;}
+  background:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120' fill='none' stroke='%23B98A2E' stroke-linecap='round'><path d='M6 0 V84 Q6 114 36 114 H120' stroke-width='1.6' opacity='.85'/><path d='M16 0 V78 Q16 104 42 104 H120' stroke-width='1' opacity='.5'/><g transform='translate(34 86)' stroke-width='1.3'><circle r='4.5' fill='%23B98A2E'/><ellipse cy='-10' rx='3.6' ry='6'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(45)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(90)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(135)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(180)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(225)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(270)'/><ellipse cy='-10' rx='3.6' ry='6' transform='rotate(315)'/></g><path d='M50 90 q16 -10 30 -2 q-8 10 -20 6' stroke-width='1.2'/><path d='M30 70 q-10 -16 -2 -30 q10 8 6 20' stroke-width='1.2'/><g fill='%23B98A2E' stroke='none'><circle cx='92' cy='104' r='2.4'/><circle cx='104' cy='104' r='1.8'/><circle cx='114' cy='104' r='1.2'/><circle cx='16' cy='30' r='2.4'/><circle cx='16' cy='18' r='1.8'/><circle cx='16' cy='8' r='1.2'/></g></svg>") no-repeat center/contain;}
 .half .corner.l{left:.4vh;}
 .half .corner.r{right:.4vh;transform:scaleX(-1);}
 .half .crown{display:block;width:5vh;height:5vh;margin:0 auto -.4vh;}
@@ -322,6 +322,86 @@ dialog .acts{display:flex;gap:10px;justify-content:flex-end;}
 .toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);opacity:0;z-index:60;
   background:var(--text);color:#2A0A12;padding:11px 16px;border-radius:12px;font-weight:800;font-size:14px;transition:all .25s;pointer-events:none;max-width:calc(100% - 32px);text-align:center;box-shadow:var(--shadow);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ═════════════ LIGHT THEME ═════════════
+   Ivory and cream with deep-plum text; gold, Kids pink and Adults emerald stay. */
+:root{
+  color-scheme:light;
+  --bg:#FBF4EA; --surface:#FFFFFF; --surface-2:#F6ECDF; --surface-3:#EFE1CF;
+  --border:rgba(74,22,52,.10); --border-2:rgba(74,22,52,.18); --border-gold:rgba(184,134,46,.38);
+  --gold:#C98A0B; --gold-2:#A86F00;
+  --text:#2B0F22; --muted:#6D4C62; --dim:#9A8090;
+  --shadow:0 10px 30px rgba(74,22,52,.12);
+}
+body{background-image:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(229,37,125,.08),transparent 60%),
+                      radial-gradient(ellipse 60% 40% at 0% 110%,rgba(255,122,26,.08),transparent 60%),
+                      radial-gradient(ellipse 50% 40% at 100% 100%,rgba(24,199,122,.06),transparent 60%);}
+.lattice{opacity:.055;}
+/* PIN gate */
+.gate-card{background:linear-gradient(180deg,#FFFFFF,#FFF8EF);box-shadow:0 30px 70px rgba(74,22,52,.14);}
+.gate-card h1{color:var(--gold-2);text-shadow:none;}
+.pad button{background:var(--surface-2);border-color:var(--border);color:var(--text);}
+.pad button:hover{background:var(--surface-3);}
+/* screen */
+#screen{background:radial-gradient(ellipse 70% 55% at 50% 40%,rgba(229,37,125,.06),transparent 70%),var(--bg);}
+#screen::after{box-shadow:inset 0 0 16vh rgba(150,90,40,.12);}
+.garland{filter:drop-shadow(0 .5vh .6vh rgba(74,22,52,.18));}
+.watermark{opacity:.045;}
+.s-head h1{background:linear-gradient(180deg,#D9A02B 5%,#A86F00 55%,#7A4E00 95%);-webkit-background-clip:text;background-clip:text;filter:none;}
+.half{box-shadow:0 2vh 5vh rgba(74,22,52,.10),inset 0 0 0 1px rgba(255,255,255,.6);}
+.half.kids{--rim:rgba(214,61,130,.45);--rim2:rgba(184,134,46,.38);--lbl:#C2185B;--glow:rgba(226,80,138,.45);
+  background:linear-gradient(180deg,#FCE3EF 0%,#FFFFFF 60%);}
+.half.adults{--rim:rgba(18,128,90,.42);--rim2:rgba(184,134,46,.38);--lbl:#0F7A55;--glow:rgba(24,160,110,.4);
+  background:linear-gradient(180deg,#DCF2E8 0%,#FFFFFF 60%);}
+.half .hh h2{text-shadow:none;}
+.half .tile{box-shadow:0 .8vh 1.8vh rgba(74,22,52,.18),inset 0 .3vh 0 rgba(255,255,255,.25);}
+.s-tools button{background:rgba(255,255,255,.9);color:var(--muted);}
+.s-net{background:rgba(255,255,255,.95);}
+/* control */
+.c-top{background:rgba(251,244,234,.92);}
+.dbar{background:rgba(251,244,234,.95);}
+.brand h1{color:var(--gold-2);}
+.pill{background:var(--surface);}
+.tabs{background:var(--surface-2);}
+.tabs button[aria-selected="true"]{background:var(--surface);box-shadow:0 1px 3px rgba(74,22,52,.12);}
+.panel{background:var(--surface);border-color:var(--border);box-shadow:0 1px 3px rgba(74,22,52,.05);}
+.ph h2{color:var(--gold-2);}
+.ph .n{border-color:rgba(184,134,46,.5);color:var(--gold-2);}
+.btn{background:var(--surface-2);}
+.btn:hover:not(:disabled){background:var(--surface-3);}
+.btn.pri,.banner button{background:#F2B23A;color:#2A0A12;}
+.btn.pri:hover:not(:disabled){background:#E9A51F;}
+.btn.danger,.btn.act.x{background:rgba(220,60,60,.08);border-color:rgba(220,60,60,.4);color:#B42318;}
+.btn.act.x:hover:not(:disabled){background:rgba(220,60,60,.15);}
+.btn.act.r{background:rgba(24,160,110,.12);border-color:rgba(24,160,110,.5);color:#0F7A55;}
+.btn.act.r:hover:not(:disabled){background:rgba(24,160,110,.2);}
+#aReady.k{background:rgba(214,61,130,.12);border-color:rgba(214,61,130,.5);color:#C2185B;}
+#aReady.k:hover:not(:disabled){background:rgba(214,61,130,.2);}
+.search input,.field input{background:var(--surface);}
+.search input:focus,.field input:focus{box-shadow:0 0 0 3px rgba(201,138,11,.18);}
+.chipf[aria-pressed="true"]{background:var(--text);color:#FFF8EF;}
+.tk-b{background:var(--surface);border-color:rgba(74,22,52,.12);color:#3A1B2E;}
+.tk-b:hover{background:#FBF3EA;}
+.tk-b.sel:not(.r){background:var(--text);color:#FFF8EF;}
+.gsw{background:var(--surface-2);}
+.actbar{background:rgba(255,255,255,.97);border-color:var(--border-2);box-shadow:0 -8px 24px rgba(74,22,52,.08);}
+.line{background:var(--surface-2);}
+.line.k h3{color:#C2185B;} .line.a h3{color:#0F7A55;}
+.line h3 .c{background:rgba(74,22,52,.08);}
+.line.k .qchips button{background:rgba(214,61,130,.12);border-color:rgba(214,61,130,.5);color:#8A1A52;}
+.line.a .qchips button{background:rgba(24,160,110,.12);border-color:rgba(24,160,110,.5);color:#0B5A3E;}
+.line .qchips button.gone{color:#B42318;border-color:rgba(220,60,60,.55) !important;}
+.di{background:var(--surface-2);}
+.di .k.kids{background:rgba(214,61,130,.12);color:#C2185B;}
+.di .k.r{background:rgba(24,160,110,.12);color:#0F7A55;}
+.di .k.rem{background:rgba(220,60,60,.1);color:#B42318;}
+.di .k.set{background:rgba(120,70,200,.12);color:#6B3FB5;}
+.di .x:hover{background:rgba(74,22,52,.06);}
+.banner .warn{background:rgba(255,182,39,.14);border-color:rgba(201,138,11,.4);}
+.banner .bad{background:rgba(220,60,60,.08);border-color:rgba(220,60,60,.35);}
+dialog{background:var(--surface);box-shadow:0 30px 70px rgba(74,22,52,.2);}
+dialog::backdrop{background:rgba(43,15,34,.35);}
+.toast{background:var(--text);color:#FFF4DC;}
 
 @media (prefers-reduced-motion:reduce){ *{animation:none !important;transition:none !important;} }
 </style>
@@ -606,9 +686,9 @@ function mandalaSvg(){
 function lotusSvg(){
   const p = [];
   [[-62,.55],[-34,.8],[0,1],[34,.8],[62,.55]].forEach(([a, k]) =>
-    p.push(`<path d="M0 20 C${-14*k} ${4-10*k} ${-10*k} ${-22*k} 0 ${-40*k} C${10*k} ${-22*k} ${14*k} ${4-10*k} 0 20Z" transform="rotate(${a} 0 20)" fill="rgba(232,196,106,.12)" stroke="#E8C46A" stroke-width="2.2"/>`));
-  p.push('<path d="M-34 26 Q0 40 34 26" fill="none" stroke="#E8C46A" stroke-width="2.2" stroke-linecap="round"/>');
-  p.push('<circle cx="0" cy="34" r="2.6" fill="#E8C46A"/>');
+    p.push(`<path d="M0 20 C${-14*k} ${4-10*k} ${-10*k} ${-22*k} 0 ${-40*k} C${10*k} ${-22*k} ${14*k} ${4-10*k} 0 20Z" transform="rotate(${a} 0 20)" fill="rgba(185,138,46,.10)" stroke="#B98A2E" stroke-width="2.2"/>`));
+  p.push('<path d="M-34 26 Q0 40 34 26" fill="none" stroke="#B98A2E" stroke-width="2.2" stroke-linecap="round"/>');
+  p.push('<circle cx="0" cy="34" r="2.6" fill="#B98A2E"/>');
   return p.join('');
 }
 /* A marigold garland draped across the top of the screen. */
